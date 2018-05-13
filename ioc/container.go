@@ -1,6 +1,11 @@
 package ioc
 
-import "reflect"
+import (
+	"fmt"
+	"reflect"
+
+	"github.com/pkg/errors"
+)
 
 type Container struct {
 	coreComponents map[string][]*Component
@@ -115,8 +120,8 @@ func (self *Container) extractInstances(name string, components map[string][]*Co
 func (self *Container) getComponentInstances(name string) ([]reflect.Value, []*Component) {
 
 	defer func() {
-		if err := recover(); err != nil {
-			panic(&ComponentInstanciationsError{name, err})
+		if err, ok := recover().(error); ok {
+			panic(errors.Wrapf(err, "Error during instanciations of '%s'", name))
 		}
 	}()
 
@@ -152,9 +157,9 @@ func (self *Container) GetComponent(name string) interface{} {
 	instances, producers := self.getComponentInstances(name)
 
 	if len(instances) == 0 {
-		panic(&NoProducerError{name})
+		panic(fmt.Errorf("No producer found for '%s'.", name))
 	} else if len(instances) > 1 {
-		panic(&TooManyProducersError{name, producers})
+		panic(fmt.Errorf("Too many producers found for '%s': %v.", name, producers))
 	}
 
 	return self.convertToInterface(instances)[0]

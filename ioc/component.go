@@ -1,7 +1,10 @@
 package ioc
 
 import (
+	"fmt"
 	"reflect"
+
+	"github.com/pkg/errors"
 )
 
 type PostInitAwarable interface {
@@ -24,8 +27,8 @@ var STRING_TYPE reflect.Type = reflect.TypeOf("")
 func NewComponent(factory interface{}, inputs []string, name string, aliases []string) *Component {
 
 	defer func() {
-		if err := recover(); err != nil {
-			panic(&ComponentRegistrationError{name, err})
+		if err, ok := recover().(error); ok {
+			panic(errors.Wrapf(err, "Error during registration of '%s'", name))
 		}
 	}()
 
@@ -35,7 +38,7 @@ func NewComponent(factory interface{}, inputs []string, name string, aliases []s
 	uniqueAliases[name] = true
 	for _, alias := range aliases {
 		if _, ok := uniqueAliases[alias]; ok {
-			panic(&NotUniqueAliasError{alias})
+			panic(fmt.Errorf("Alias specified more than once: '%s'.", alias))
 		}
 		uniqueAliases[alias] = true
 	}
@@ -49,7 +52,7 @@ func NewComponent(factory interface{}, inputs []string, name string, aliases []s
 
 	factoValue := reflect.ValueOf(factory)
 	if factoValue.Kind() != reflect.Func {
-		panic(&NotFunctionFactoryError{factoValue.Kind()})
+		panic(fmt.Errorf("The factory is not a %v, and not a function.", factoValue.Kind()))
 	}
 
 	factoType := factoValue.Type()
@@ -57,11 +60,11 @@ func NewComponent(factory interface{}, inputs []string, name string, aliases []s
 	numOut := factoType.NumOut()
 
 	if numIn != len(inputs) {
-		panic(&InvalidInputNumberError{numIn, len(inputs)})
+		panic(fmt.Errorf("The actual input number of the factory (%d) doesn't match the definition (%d).", numIn, len(inputs)))
 	}
 
 	if numOut != 1 {
-		panic(&InvalidOutputNumberError{numOut})
+		panic(fmt.Errorf("The output number of the factory should be 1, not %d.", numOut))
 	}
 
 	outKind := factoType.Out(0).Kind()
@@ -72,7 +75,7 @@ func NewComponent(factory interface{}, inputs []string, name string, aliases []s
 	correctKind = correctKind || outKind == reflect.Ptr
 	correctKind = correctKind || outKind == reflect.Slice
 	if !correctKind {
-		panic(&InvalidOutputKindError{outKind})
+		panic(fmt.Errorf("The output type should be a chan, a function, an interface, a map, a pointer or a slice, not a %v.", outKind))
 	}
 
 	return &Component{name, allAliases, factoValue, inputs}
@@ -95,7 +98,7 @@ func (self *Component) resolve(container *Container, name string, class reflect.
 	} else if class.Kind() == reflect.Map {
 
 		if keyClass := class.Key(); keyClass != STRING_TYPE {
-			panic(&InvalidKeyTypeError{keyClass})
+			panic(fmt.Errorf("Unsupported key type for a map injection: %v, only 'string' is valid.", keyClass))
 		}
 
 		class = class.Elem()
@@ -110,9 +113,9 @@ func (self *Component) resolve(container *Container, name string, class reflect.
 	} else {
 
 		if len(instances) == 0 {
-			panic(&NoProducerError{name})
+			panic(fmt.Errorf("No producer found for '%s'.", name))
 		} else if len(instances) > 1 {
-			panic(&TooManyProducersError{name, producers})
+			panic(fmt.Errorf("Too many producers found for '%s': %v.", name, producers))
 		}
 
 		return instances[0]
@@ -124,8 +127,8 @@ func (self *Component) resolve(container *Container, name string, class reflect.
 func (self *Component) Instanciate(container *Container) reflect.Value {
 
 	defer func() {
-		if err := recover(); err != nil {
-			panic(&ComponentInstanciationError{self, err})
+		if err, ok := recover().(error); ok {
+			panic(errors.Wrapf(err, "Error during instanciation of '%s'", self.name))
 		}
 	}()
 
@@ -150,8 +153,8 @@ func (self *Component) Instanciate(container *Container) reflect.Value {
 func (self *Component) Initialize(container *Container, instance reflect.Value) {
 
 	defer func() {
-		if err := recover(); err != nil {
-			panic(&ComponentInitialisationError{self, err})
+		if err, ok := recover().(error); ok {
+			panic(errors.Wrapf(err, "Error during initialisation of '%s'", self.name))
 		}
 	}()
 
