@@ -2,6 +2,18 @@
 
 
 [[projects]]
+  name = "github.com/BurntSushi/toml"
+  packages = ["."]
+  revision = "b26d9c308763d68093482582cea63d69be07a0f0"
+  version = "v0.3.0"
+
+[[projects]]
+  name = "github.com/magiconair/properties"
+  packages = ["."]
+  revision = "c3beff4c2358b44d0493c7dda585e7db7ff28ae6"
+  version = "v1.7.6"
+
+[[projects]]
   name = "github.com/onsi/ginkgo"
   packages = [
     ".",
@@ -112,6 +124,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "4c6d442fb88725f02b4fdc061abedf6f273b4f1835fbe0f7458019f69dc957e5"
+  inputs-digest = "1a3b85150bd539c1fc6ed459ec5a9e9054d51776b0c2f6614cc8db8bd7cc7ff7"
   solver-name = "gps-cdcl"
   solver-version = 1
