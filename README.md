@@ -1,0 +1,2 @@
+# pigs
+My Go library
