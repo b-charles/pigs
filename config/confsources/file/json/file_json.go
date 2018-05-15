@@ -1,18 +1,21 @@
-package confsources
+package json
 
 import (
-	"encoding/json"
+	enc "encoding/json"
+
+	. "github.com/l3eegbee/pigs/config/confsources"
+	. "github.com/l3eegbee/pigs/config/confsources/file"
 )
 
 func ParseJsonToEnv(content string) map[string]string {
 
 	root := make(map[string]interface{})
-	if err := json.Unmarshal([]byte(content), &root); err != nil {
+	if err := enc.Unmarshal([]byte(content), &root); err != nil {
 		panic(err)
 	}
 
 	env := make(map[string]string)
-	convertObjectInEnv(env, "", root)
+	ConvertObjectInEnv(env, "", root)
 
 	return env
 

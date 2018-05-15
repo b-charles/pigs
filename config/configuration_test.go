@@ -1,13 +1,20 @@
 package config_test
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	. "github.com/l3eegbee/pigs/config"
-	"github.com/l3eegbee/pigs/config/confsources"
+	. "github.com/l3eegbee/pigs/config/confsources/programmatic"
 	"github.com/l3eegbee/pigs/ioc"
 )
+
+func TestConfig(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Config Suite")
+}
 
 var _ = Describe("Configuration", func() {
 
@@ -19,7 +26,7 @@ var _ = Describe("Configuration", func() {
 
 		It("Should get a simple source", func() {
 
-			confsources.SetEnvForTests(map[string]string{
+			SetEnvForTests(map[string]string{
 				"hello": "world",
 			})
 
@@ -31,10 +38,10 @@ var _ = Describe("Configuration", func() {
 
 		It("Should merge multiple sources", func() {
 
-			confsources.SetEnvForTestsWithPriority(1, map[string]string{
+			SetEnvForTestsWithPriority(1, map[string]string{
 				"hello": "bob",
 			})
-			confsources.SetEnvForTestsWithPriority(0, map[string]string{
+			SetEnvForTestsWithPriority(0, map[string]string{
 				"hello": "world",
 			})
 
@@ -50,7 +57,7 @@ var _ = Describe("Configuration", func() {
 
 		It("Should resolve simple placeholder", func() {
 
-			confsources.SetEnvForTests(map[string]string{
+			SetEnvForTests(map[string]string{
 				"name":   "Batman",
 				"whoami": "I'm ${name}",
 			})
@@ -63,7 +70,7 @@ var _ = Describe("Configuration", func() {
 
 		It("Should resolve complex placeholder", func() {
 
-			confsources.SetEnvForTests(map[string]string{
+			SetEnvForTests(map[string]string{
 				"egg":             "oeuf",
 				"ham":             "jambon",
 				"cheese":          "fromage",

@@ -1,31 +1,37 @@
-package confsources_test
+package toml_test
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "github.com/l3eegbee/pigs/config/confsources"
+	. "github.com/l3eegbee/pigs/config/confsources/file/toml"
 )
 
-var _ = Describe("FileJson", func() {
+func TestConfsources(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Toml config sources Suite")
+}
 
-	It("should parse correctly a JSON file", func() {
+var _ = Describe("FileToml", func() {
+
+	It("should parse correctly a Toml file", func() {
 
 		testContent := `
-		{
-			"my": {
-				"property": "MyValue",
-				"number": 42,
-				"float": 1.61803398,
-				"array": [ "one", "two", 3 ],
-				"substruct": {
-					"toto": "tata"
-				}
-			}
-		}
+
+		[my]
+		property = "MyValue"
+		number = 42
+		float = 1.61803398
+		array = [ "one", "two", "3" ]
+
+		[my.substruct]
+		toto = "tata"
+
 		`
 
-		env := ParseJsonToEnv(testContent)
+		env := ParseTomlToEnv(testContent)
 
 		Expect(env).Should(HaveLen(7))
 		Expect(env).Should(HaveKeyWithValue("my.property", "MyValue"))

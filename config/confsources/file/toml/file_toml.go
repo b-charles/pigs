@@ -1,16 +1,21 @@
-package confsources
+package toml
 
-import "github.com/BurntSushi/toml"
+import (
+	enc "github.com/BurntSushi/toml"
+
+	. "github.com/l3eegbee/pigs/config/confsources"
+	. "github.com/l3eegbee/pigs/config/confsources/file"
+)
 
 func ParseTomlToEnv(content string) map[string]string {
 
 	root := make(map[string]interface{})
-	if err := toml.Unmarshal([]byte(content), &root); err != nil {
+	if err := enc.Unmarshal([]byte(content), &root); err != nil {
 		panic(err)
 	}
 
 	env := make(map[string]string)
-	convertObjectInEnv(env, "", root)
+	ConvertObjectInEnv(env, "", root)
 
 	return env
 

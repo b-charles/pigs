@@ -1,4 +1,4 @@
-package confsources
+package file
 
 import (
 	"fmt"
@@ -8,15 +8,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/l3eegbee/pigs/config"
+	. "github.com/l3eegbee/pigs/config/confsources"
 	"github.com/l3eegbee/pigs/ioc"
-
-	"github.com/spf13/afero"
-
-	_ "github.com/l3eegbee/pigs/filesystem"
 )
 
-func convertObjectInEnv(env map[string]string, root string, object interface{}) {
+func ConvertObjectInEnv(env map[string]string, root string, object interface{}) {
 
 	if object == nil {
 		return
@@ -42,7 +38,7 @@ func convertObjectInEnv(env map[string]string, root string, object interface{}) 
 	case []interface{}:
 
 		for idx, elt := range value {
-			convertObjectInEnv(env, fmt.Sprintf("%s[%d]", root, idx), elt)
+			ConvertObjectInEnv(env, fmt.Sprintf("%s[%d]", root, idx), elt)
 		}
 
 	case map[string]interface{}:
@@ -53,7 +49,7 @@ func convertObjectInEnv(env map[string]string, root string, object interface{}) 
 		}
 
 		for k, v := range value {
-			convertObjectInEnv(env, rootWithPoint+k, v)
+			ConvertObjectInEnv(env, rootWithPoint+k, v)
 		}
 
 	case map[interface{}]interface{}:
@@ -64,7 +60,7 @@ func convertObjectInEnv(env map[string]string, root string, object interface{}) 
 		}
 
 		for k, v := range value {
-			convertObjectInEnv(env, fmt.Sprintf("%s%v", rootWithPoint, k), v)
+			ConvertObjectInEnv(env, fmt.Sprintf("%s%v", rootWithPoint, k), v)
 		}
 
 	default:
@@ -74,6 +70,10 @@ func convertObjectInEnv(env map[string]string, root string, object interface{}) 
 
 }
 
+type Filesystem interface {
+	ReadFile(file string) (string, error)
+}
+
 func RegisterFileConfig(
 	priority int,
 	ext string,
@@ -81,24 +81,28 @@ func RegisterFileConfig(
 	name string,
 	aliases ...string) {
 
-	ioc.PutFactory(func(filesystem *afero.Afero) *config.SimpleConfigSource {
+	ioc.PutFactory(func(fs Filesystem) *SimpleConfigSource {
 
 		app, err := filepath.Abs(os.Args[0])
 		app = strings.TrimSuffix(app, filepath.Ext(app))
 		file := app + ext
 
-		content, err := filesystem.ReadFile(file)
+		content, err := fs.ReadFile(file)
 		if err != nil {
 			return nil
 		}
 
-		return &config.SimpleConfigSource{
+		return &SimpleConfigSource{
 			Priority: priority,
 			Env:      parser(string(content)),
 		}
 
 	}, []string{"Filesystem"}, name, append(aliases, "ConfigSources")...)
 
+}
+
+type EnvVar interface {
+	LoadEnv() map[string]string
 }
 
 func RegisterFormatedEnvVarConfig(
@@ -108,7 +112,7 @@ func RegisterFormatedEnvVarConfig(
 	name string,
 	aliases ...string) {
 
-	ioc.PutFactory(func(envvar config.ConfigSource) *config.SimpleConfigSource {
+	ioc.PutFactory(func(envvar EnvVar) *SimpleConfigSource {
 
 		app := filepath.Base(os.Args[0])
 		app = strings.TrimSuffix(app, filepath.Ext(app))
@@ -116,7 +120,7 @@ func RegisterFormatedEnvVarConfig(
 
 		env := envvar.LoadEnv()
 		if content, ok := env[app]; ok {
-			return &config.SimpleConfigSource{
+			return &SimpleConfigSource{
 				Priority: priority,
 				Env:      parser(content),
 			}
@@ -124,6 +128,6 @@ func RegisterFormatedEnvVarConfig(
 
 		return nil
 
-	}, []string{"EnvVarConfigSource"}, name, append(aliases, "ConfigSources")...)
+	}, []string{"EnvVar"}, name, append(aliases, "ConfigSources")...)
 
 }

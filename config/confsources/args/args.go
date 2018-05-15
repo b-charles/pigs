@@ -1,10 +1,10 @@
-package confsources
+package args
 
 import (
 	"os"
 	"regexp"
 
-	"github.com/l3eegbee/pigs/config"
+	. "github.com/l3eegbee/pigs/config/confsources"
 	"github.com/l3eegbee/pigs/ioc"
 )
 
@@ -14,7 +14,7 @@ var valueRegexpDouble *regexp.Regexp = regexp.MustCompile("^--([^=]+)=\"(.*)\"$"
 var boolRegexp *regexp.Regexp = regexp.MustCompile("^--([^=]+)$")
 var noboolRegexp *regexp.Regexp = regexp.MustCompile("^--no-([^=]+)$")
 
-func NewArgsConfigSource(args []string) *config.SimpleConfigSource {
+func NewArgsConfigSource(args []string) *SimpleConfigSource {
 
 	env := make(map[string]string)
 
@@ -43,7 +43,7 @@ func NewArgsConfigSource(args []string) *config.SimpleConfigSource {
 
 	}
 
-	return &config.SimpleConfigSource{
+	return &SimpleConfigSource{
 		Priority: CONFIG_SOURCE_PRIORITY_ARGS,
 		Env:      env,
 	}

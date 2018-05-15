@@ -1,30 +1,37 @@
-package confsources_test
+package json_test
 
 import (
+	"testing"
+
+	. "github.com/l3eegbee/pigs/config/confsources/file/json"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	. "github.com/l3eegbee/pigs/config/confsources"
 )
 
-var _ = Describe("FileYaml", func() {
+func TestConfsources(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "JSON config sources Suite")
+}
 
-	It("should parse correctly a Yaml file", func() {
+var _ = Describe("FileJson", func() {
+
+	It("should parse correctly a JSON file", func() {
 
 		testContent := `
-my:
-    property: "MyValue"
-    number: 42
-    float: 1.61803398
-    array:
-        - one
-        - two
-        - 3
-    substruct:
-        toto: tata
-       `
+		{
+			"my": {
+				"property": "MyValue",
+				"number": 42,
+				"float": 1.61803398,
+				"array": [ "one", "two", 3 ],
+				"substruct": {
+					"toto": "tata"
+				}
+			}
+		}
+		`
 
-		env := ParseYamlToEnv(testContent)
+		env := ParseJsonToEnv(testContent)
 
 		Expect(env).Should(HaveLen(7))
 		Expect(env).Should(HaveKeyWithValue("my.property", "MyValue"))

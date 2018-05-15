@@ -1,20 +1,20 @@
-package confsources
+package conf
 
 import (
 	"fmt"
 	"sync"
 
-	"github.com/l3eegbee/pigs/config"
+	. "github.com/l3eegbee/pigs/config/confsources"
 	"github.com/l3eegbee/pigs/ioc"
 )
 
 type DefaultConfigSource struct {
-	*config.SimpleConfigSource
+	*SimpleConfigSource
 }
 
 func NewDefaultConfigSource() *DefaultConfigSource {
 	return &DefaultConfigSource{
-		&config.SimpleConfigSource{
+		&SimpleConfigSource{
 			Priority: CONFIG_SOURCE_PRIORITY_DEFAULT,
 			Env:      make(map[string]string),
 		}}

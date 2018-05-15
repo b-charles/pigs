@@ -1,11 +1,18 @@
-package confsources_test
+package properties_test
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "github.com/l3eegbee/pigs/config/confsources"
+	. "github.com/l3eegbee/pigs/config/confsources/file/properties"
 )
+
+func TestConfsources(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Properties config sources Suite")
+}
 
 var _ = Describe("FileProperties", func() {
 

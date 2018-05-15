@@ -1,30 +1,37 @@
-package confsources_test
+package yaml_test
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "github.com/l3eegbee/pigs/config/confsources"
+	. "github.com/l3eegbee/pigs/config/confsources/file/yaml"
 )
 
-var _ = Describe("FileToml", func() {
+func TestConfsources(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Yaml config sources Suite")
+}
 
-	It("should parse correctly a Toml file", func() {
+var _ = Describe("FileYaml", func() {
+
+	It("should parse correctly a Yaml file", func() {
 
 		testContent := `
+my:
+    property: "MyValue"
+    number: 42
+    float: 1.61803398
+    array:
+        - one
+        - two
+        - 3
+    substruct:
+        toto: tata
+       `
 
-		[my]
-		property = "MyValue"
-		number = 42
-		float = 1.61803398
-		array = [ "one", "two", "3" ]
-
-		[my.substruct]
-		toto = "tata"
-
-		`
-
-		env := ParseTomlToEnv(testContent)
+		env := ParseYamlToEnv(testContent)
 
 		Expect(env).Should(HaveLen(7))
 		Expect(env).Should(HaveKeyWithValue("my.property", "MyValue"))

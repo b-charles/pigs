@@ -1,14 +1,15 @@
-package confsources
+package properties
 
 import (
-	"github.com/magiconair/properties"
+	enc "github.com/magiconair/properties"
 
-	_ "github.com/l3eegbee/pigs/filesystem"
+	. "github.com/l3eegbee/pigs/config/confsources"
+	. "github.com/l3eegbee/pigs/config/confsources/file"
 )
 
 func ParsePropertiesToEnv(content string) map[string]string {
 
-	p := properties.MustLoadString(content)
+	p := enc.MustLoadString(content)
 	p.Prefix = ""
 	p.Postfix = ""
 
