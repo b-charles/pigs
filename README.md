@@ -8,12 +8,19 @@ Pigs is a Go library for bootstrapping micro-service applications.
 
 Because of [Pigs is Pigs](https://www.youtube.com/watch?v=GYXlF3sa9xs) very Goish conclusion:
 > No more will I be a fool.
+>
 > Whenever comes to lifestock,
+>
 > Dash every single rule.
+>
 > If the animals come in singles
+>
 > Or if they come in sets,
+>
 > If they've got four feet and they're alive,
+>
 > They'll be classified as pet.
+>
 >
 > -- <cite>Mike Flannery</cite>
 
