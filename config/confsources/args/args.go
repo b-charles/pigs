@@ -5,16 +5,16 @@ import (
 	"regexp"
 
 	. "github.com/l3eegbee/pigs/config/confsources"
-	"github.com/l3eegbee/pigs/ioc"
 )
 
+var valueRegexp *regexp.Regexp = regexp.MustCompile("^--([^=]+)=(.*)$")
 var valueRegexpSimple *regexp.Regexp = regexp.MustCompile("^--([^=]+)='(.*)'$")
 var valueRegexpDouble *regexp.Regexp = regexp.MustCompile("^--([^=]+)=\"(.*)\"$")
 
 var boolRegexp *regexp.Regexp = regexp.MustCompile("^--([^=]+)$")
 var noboolRegexp *regexp.Regexp = regexp.MustCompile("^--no-([^=]+)$")
 
-func NewArgsConfigSource(args []string) *SimpleConfigSource {
+func ParseArgs(args []string) map[string]string {
 
 	env := make(map[string]string)
 
@@ -25,6 +25,9 @@ func NewArgsConfigSource(args []string) *SimpleConfigSource {
 		match = valueRegexpSimple.FindStringSubmatch(arg)
 		if match == nil {
 			match = valueRegexpDouble.FindStringSubmatch(arg)
+		}
+		if match == nil {
+			match = valueRegexp.FindStringSubmatch(arg)
 		}
 		if match != nil {
 			env[match[1]] = match[2]
@@ -43,13 +46,17 @@ func NewArgsConfigSource(args []string) *SimpleConfigSource {
 
 	}
 
+	return env
+
+}
+
+func NewArgsConfigSource() *SimpleConfigSource {
+
+	env := ParseArgs(os.Args[1:])
+
 	return &SimpleConfigSource{
 		Priority: CONFIG_SOURCE_PRIORITY_ARGS,
 		Env:      env,
 	}
 
-}
-
-func init() {
-	ioc.Put(NewArgsConfigSource(os.Args[1:]), "ArgsConfigSource", "ConfigSources")
 }

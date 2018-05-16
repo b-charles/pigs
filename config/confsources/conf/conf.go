@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	. "github.com/l3eegbee/pigs/config/confsources"
-	"github.com/l3eegbee/pigs/ioc"
 )
 
 type DefaultConfigSource struct {
@@ -42,8 +41,4 @@ func DefaultConfigSourceInstance() *DefaultConfigSource {
 
 func SetDefault(key, value string) {
 	DefaultConfigSourceInstance().Set(key, value)
-}
-
-func init() {
-	ioc.Put(DefaultConfigSourceInstance(), "DefaultConfigSource", "DefaultConfigSources")
 }

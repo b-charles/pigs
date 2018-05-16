@@ -5,8 +5,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-
-	"github.com/l3eegbee/pigs/ioc"
 )
 
 /*
@@ -162,18 +160,5 @@ func resolveValue(env map[string]string, resolved map[string]bool, key string, p
 	resolved[key] = true
 
 	return value, nil
-
-}
-
-/*
- * IOC registration
- */
-
-func init() {
-
-	ioc.PutFactory(
-		func(defaultSources []ConfigSource, sources []ConfigSource) *Configuration {
-			return CreateConfiguration(append(defaultSources, sources...))
-		}, []string{"DefaultConfigSources", "ConfigSources"}, "Configuration")
 
 }

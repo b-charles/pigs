@@ -17,41 +17,41 @@ var _ = Describe("Args", func() {
 
 	It("should parse value between simple quote", func() {
 
-		source := NewArgsConfigSource([]string{
+		source := ParseArgs([]string{
 			"--jamiroquai='Virtual Insanity'",
 		})
 
-		Expect(source.LoadEnv()).Should(HaveKeyWithValue("jamiroquai", "Virtual Insanity"))
+		Expect(source).Should(HaveKeyWithValue("jamiroquai", "Virtual Insanity"))
 
 	})
 
 	It("should parse value between double quote", func() {
 
-		source := NewArgsConfigSource([]string{
+		source := ParseArgs([]string{
 			"--santana=\"Flor D'Luna\"",
 		})
 
-		Expect(source.LoadEnv()).Should(HaveKeyWithValue("santana", "Flor D'Luna"))
+		Expect(source).Should(HaveKeyWithValue("santana", "Flor D'Luna"))
 
 	})
 
 	It("should parse boolean", func() {
 
-		source := NewArgsConfigSource([]string{
+		source := ParseArgs([]string{
 			"--yes",
 		})
 
-		Expect(source.LoadEnv()).Should(HaveKeyWithValue("yes", "true"))
+		Expect(source).Should(HaveKeyWithValue("yes", "true"))
 
 	})
 
 	It("should parse false boolean", func() {
 
-		source := NewArgsConfigSource([]string{
+		source := ParseArgs([]string{
 			"--no-yes",
 		})
 
-		Expect(source.LoadEnv()).Should(HaveKeyWithValue("yes", "false"))
+		Expect(source).Should(HaveKeyWithValue("yes", "false"))
 
 	})
 

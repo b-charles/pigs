@@ -1,4 +1,4 @@
-package filesystem
+package init
 
 import (
 	"github.com/l3eegbee/pigs/ioc"

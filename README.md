@@ -1,6 +1,6 @@
 # Pigs
 
-# What's Pigs?
+## What's Pigs?
 
 Pigs is a Go library for bootstrapping micro-service applications.
 

@@ -3,7 +3,6 @@ package yaml
 import (
 	enc "gopkg.in/yaml.v2"
 
-	. "github.com/l3eegbee/pigs/config/confsources"
 	. "github.com/l3eegbee/pigs/config/confsources/file"
 )
 
@@ -18,21 +17,5 @@ func ParseYamlToEnv(content string) map[string]string {
 	ConvertObjectInEnv(env, "", root)
 
 	return env
-
-}
-
-func init() {
-
-	RegisterFileConfig(
-		CONFIG_SOURCE_PRIORITY_FILE_YAML,
-		".yaml",
-		ParseYamlToEnv,
-		"YamlFileConfigSource")
-
-	RegisterFormatedEnvVarConfig(
-		CONFIG_SOURCE_PRIORITY_ENV_VAR_YAML,
-		"_APPLICATION_YAML",
-		ParseYamlToEnv,
-		"YamlEnvVarConfigSource")
 
 }
