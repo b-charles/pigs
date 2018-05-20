@@ -21,7 +21,11 @@ type ConfigSource interface {
  */
 
 type Configuration struct {
-	Env map[string]string
+	env map[string]string
+}
+
+func (self *Configuration) GetEnv() map[string]string {
+	return self.env
 }
 
 /*

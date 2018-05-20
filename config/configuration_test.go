@@ -8,6 +8,7 @@ import (
 
 	. "github.com/l3eegbee/pigs/config"
 	. "github.com/l3eegbee/pigs/config/confsources/programmatic"
+	_ "github.com/l3eegbee/pigs/config/init"
 	"github.com/l3eegbee/pigs/ioc"
 )
 
@@ -32,7 +33,7 @@ var _ = Describe("Configuration", func() {
 
 			config := ioc.GetComponent("Configuration").(*Configuration)
 
-			Expect(config.Env).Should(HaveKeyWithValue("hello", "world"))
+			Expect(config.GetEnv()).Should(HaveKeyWithValue("hello", "world"))
 
 		})
 
@@ -47,7 +48,7 @@ var _ = Describe("Configuration", func() {
 
 			config := ioc.GetComponent("Configuration").(*Configuration)
 
-			Expect(config.Env).Should(HaveKeyWithValue("hello", "bob"))
+			Expect(config.GetEnv()).Should(HaveKeyWithValue("hello", "bob"))
 
 		})
 
@@ -64,7 +65,7 @@ var _ = Describe("Configuration", func() {
 
 			config := ioc.GetComponent("Configuration").(*Configuration)
 
-			Expect(config.Env).Should(HaveKeyWithValue("whoami", "I'm Batman"))
+			Expect(config.GetEnv()).Should(HaveKeyWithValue("whoami", "I'm Batman"))
 
 		})
 
@@ -81,7 +82,7 @@ var _ = Describe("Configuration", func() {
 
 			config := ioc.GetComponent("Configuration").(*Configuration)
 
-			Expect(config.Env).Should(HaveKeyWithValue("plate", "oeuf, jambon, fromage"))
+			Expect(config.GetEnv()).Should(HaveKeyWithValue("plate", "oeuf, jambon, fromage"))
 
 		})
 
