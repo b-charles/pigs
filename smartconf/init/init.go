@@ -12,8 +12,11 @@ type EnvLoader interface {
 func init() {
 
 	ioc.PutFactory(
-		func(envLoader EnvLoader, parsers []interface{}) *SmartConf {
-			return NewSmartConf(envLoader.GetEnv(), parsers)
-		}, []string{"Configuration", "StringParsers"}, "SmartConfiguration")
+		func(injected struct {
+			Configuration map[string]string
+			StringParsers []interface{}
+		}) *SmartConf {
+			return NewSmartConf(injected.Configuration, injected.StringParsers)
+		}, "SmartConfiguration")
 
 }

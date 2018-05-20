@@ -81,13 +81,15 @@ func RegisterFileConfig(
 	name string,
 	aliases ...string) {
 
-	ioc.PutFactory(func(fs Filesystem) *SimpleConfigSource {
+	ioc.PutFactory(func(injected struct {
+		Filesystem Filesystem
+	}) *SimpleConfigSource {
 
 		app, err := filepath.Abs(os.Args[0])
 		app = strings.TrimSuffix(app, filepath.Ext(app))
 		file := app + ext
 
-		content, err := fs.ReadFile(file)
+		content, err := injected.Filesystem.ReadFile(file)
 		if err != nil {
 			return nil
 		}
@@ -97,7 +99,7 @@ func RegisterFileConfig(
 			Env:      parser(string(content)),
 		}
 
-	}, []string{"Filesystem"}, name, append(aliases, "ConfigSources")...)
+	}, name, append(aliases, "ConfigSources")...)
 
 }
 
@@ -112,13 +114,15 @@ func RegisterFormatedEnvVarConfig(
 	name string,
 	aliases ...string) {
 
-	ioc.PutFactory(func(envvar EnvVar) *SimpleConfigSource {
+	ioc.PutFactory(func(injected struct {
+		EnvVar EnvVar
+	}) *SimpleConfigSource {
 
 		app := filepath.Base(os.Args[0])
 		app = strings.TrimSuffix(app, filepath.Ext(app))
 		app = ConvertEnvVarKey(app + prefix)
 
-		env := envvar.LoadEnv()
+		env := injected.EnvVar.LoadEnv()
 		if content, ok := env[app]; ok {
 			return &SimpleConfigSource{
 				Priority: priority,
@@ -128,6 +132,6 @@ func RegisterFormatedEnvVarConfig(
 
 		return nil
 
-	}, []string{"EnvVar"}, name, append(aliases, "ConfigSources")...)
+	}, name, append(aliases, "ConfigSources")...)
 
 }

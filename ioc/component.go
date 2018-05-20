@@ -19,12 +19,33 @@ type Component struct {
 	name    string
 	aliases []string
 	factory reflect.Value
-	inputs  []string
 }
 
 var STRING_TYPE reflect.Type = reflect.TypeOf("")
 
-func NewComponent(factory interface{}, inputs []string, name string, aliases []string) *Component {
+func checkInInjectedMethod(method reflect.Value) {
+
+	methodType := method.Type()
+
+	numIn := methodType.NumIn()
+	if numIn != 0 && numIn != 1 {
+		panic(fmt.Errorf("The function should take none or one argument (not %d).", numIn))
+	}
+
+	if numIn == 1 {
+		in := methodType.In(0)
+		kindIn := in.Kind()
+		if kindIn == reflect.Ptr {
+			kindIn = in.Elem().Kind()
+		}
+		if kindIn != reflect.Struct {
+			panic(fmt.Errorf("The function should only take a struct or a pointer to a struct as argument (not a %v)", in))
+		}
+	}
+
+}
+
+func NewComponent(factory interface{}, name string, aliases []string) *Component {
 
 	defer func() {
 		if err, ok := recover().(error); ok {
@@ -52,33 +73,34 @@ func NewComponent(factory interface{}, inputs []string, name string, aliases []s
 
 	factoValue := reflect.ValueOf(factory)
 	if factoValue.Kind() != reflect.Func {
-		panic(fmt.Errorf("The factory is not a %v, and not a function.", factoValue.Kind()))
+		panic(fmt.Errorf("The factory should be a function, not a %v.", factoValue.Kind()))
 	}
+
+	// check in
+
+	checkInInjectedMethod(factoValue)
+
+	// check out
 
 	factoType := factoValue.Type()
-	numIn := factoType.NumIn()
-	numOut := factoType.NumOut()
 
-	if numIn != len(inputs) {
-		panic(fmt.Errorf("The actual input number of the factory (%d) doesn't match the definition (%d).", numIn, len(inputs)))
-	}
-
-	if numOut != 1 {
+	if numOut := factoType.NumOut(); numOut != 1 {
 		panic(fmt.Errorf("The output number of the factory should be 1, not %d.", numOut))
 	}
 
 	outKind := factoType.Out(0).Kind()
-	correctKind := outKind == reflect.Chan
-	correctKind = correctKind || outKind == reflect.Func
-	correctKind = correctKind || outKind == reflect.Interface
-	correctKind = correctKind || outKind == reflect.Map
-	correctKind = correctKind || outKind == reflect.Ptr
-	correctKind = correctKind || outKind == reflect.Slice
-	if !correctKind {
+	if outKind != reflect.Chan &&
+		outKind != reflect.Func &&
+		outKind != reflect.Interface &&
+		outKind != reflect.Map &&
+		outKind != reflect.Ptr &&
+		outKind != reflect.Slice {
 		panic(fmt.Errorf("The output type should be a chan, a function, an interface, a map, a pointer or a slice, not a %v.", outKind))
 	}
 
-	return &Component{name, allAliases, factoValue, inputs}
+	// return
+
+	return &Component{name, allAliases, factoValue}
 
 }
 
@@ -86,41 +108,104 @@ func (self *Component) resolve(container *Container, name string, class reflect.
 
 	instances, producers := container.getComponentInstances(name)
 
-	if class.Kind() == reflect.Slice {
+	if len(instances) == 0 {
+		panic(fmt.Errorf("No producer found for '%s'.", name))
+	}
 
-		class = class.Elem()
+	if instanceType := instances[0].Type(); !instanceType.AssignableTo(class) {
 
-		slice := reflect.MakeSlice(reflect.SliceOf(class), 0, len(instances))
-		slice = reflect.Append(slice, instances...)
+		if class.Kind() == reflect.Slice {
 
-		return slice
+			class = class.Elem()
 
-	} else if class.Kind() == reflect.Map {
+			slice := reflect.MakeSlice(reflect.SliceOf(class), 0, len(instances))
+			slice = reflect.Append(slice, instances...)
 
-		if keyClass := class.Key(); keyClass != STRING_TYPE {
-			panic(fmt.Errorf("Unsupported key type for a map injection: %v, only 'string' is valid.", keyClass))
+			return slice
+
+		} else if class.Kind() == reflect.Map {
+
+			if keyClass := class.Key(); keyClass != STRING_TYPE {
+				panic(fmt.Errorf("Unsupported key type for a map injection: %v, only 'string' is valid.", keyClass))
+			}
+
+			class = class.Elem()
+
+			m := reflect.MakeMapWithSize(reflect.MapOf(STRING_TYPE, class), len(instances))
+			for i := 0; i < len(instances); i++ {
+				m.SetMapIndex(reflect.ValueOf(producers[i].name), instances[i])
+			}
+
+			return m
+
 		}
-
-		class = class.Elem()
-
-		m := reflect.MakeMapWithSize(reflect.MapOf(STRING_TYPE, class), len(instances))
-		for i := 0; i < len(instances); i++ {
-			m.SetMapIndex(reflect.ValueOf(producers[i].name), instances[i])
-		}
-
-		return m
-
-	} else {
-
-		if len(instances) == 0 {
-			panic(fmt.Errorf("No producer found for '%s'.", name))
-		} else if len(instances) > 1 {
-			panic(fmt.Errorf("Too many producers found for '%s': %v.", name, producers))
-		}
-
-		return instances[0]
 
 	}
+
+	if len(instances) > 1 {
+		panic(fmt.Errorf("Too many producers found for '%s': %v.", name, producers))
+	}
+
+	return instances[0]
+
+}
+
+func (self *Component) inject(container *Container, value reflect.Value, onlyTagged bool) {
+
+	class := value.Type()
+
+	for i := 0; i < value.NumField(); i++ {
+
+		field := value.Field(i)
+		fieldType := class.Field(i)
+
+		name, ok := fieldType.Tag.Lookup("inject")
+		if !ok && onlyTagged {
+			continue
+		}
+
+		if name == "" {
+			name = fieldType.Name
+		}
+
+		if !field.CanSet() {
+			panic(fmt.Errorf("The field %v of %v is not settable.", fieldType, class))
+		}
+
+		field.Set(self.resolve(container, name, fieldType.Type))
+
+	}
+
+}
+
+func (self *Component) callInjected(container *Container, method reflect.Value) []reflect.Value {
+
+	methodType := method.Type()
+
+	numIn := methodType.NumIn()
+	args := make([]reflect.Value, numIn)
+	if numIn == 1 {
+
+		argType := methodType.In(0)
+
+		ptr := argType.Kind() == reflect.Ptr
+		if ptr {
+			argType = argType.Elem()
+		}
+
+		arg := reflect.New(argType).Elem()
+
+		self.inject(container, arg, false)
+
+		if ptr {
+			arg = arg.Addr()
+		}
+
+		args[0] = arg
+
+	}
+
+	return method.Call(args)
 
 }
 
@@ -132,16 +217,7 @@ func (self *Component) Instanciate(container *Container) reflect.Value {
 		}
 	}()
 
-	factoType := self.factory.Type()
-	numIn := factoType.NumIn()
-
-	args := make([]reflect.Value, numIn)
-
-	for i := 0; i < numIn; i++ {
-		args[i] = self.resolve(container, self.inputs[i], factoType.In(i))
-	}
-
-	instance := self.factory.Call(args)[0]
+	instance := self.callInjected(container, self.factory)[0]
 	if instance.Kind() == reflect.Interface {
 		instance = instance.Elem()
 	}
@@ -168,33 +244,26 @@ func (self *Component) Initialize(container *Container, instance reflect.Value) 
 		return
 	}
 
-	class := instance.Type()
-
-	for i := 0; i < instance.NumField(); i++ {
-
-		field := instance.Field(i)
-		fieldType := class.Field(i)
-
-		name, ok := fieldType.Tag.Lookup("inject")
-		if !ok {
-			continue
-		}
-
-		if name == "" {
-			name = fieldType.Name
-		}
-
-		field.Set(self.resolve(container, name, field.Type()))
-
-	}
+	self.inject(container, instance, true)
 
 }
 
 func (self *Component) PostInit(container *Container, instance reflect.Value) {
 
-	if postInitAwarable, ok := instance.Interface().(PostInitAwarable); ok {
-		postInitAwarable.PostInit()
+	postInit := instance.MethodByName("PostInit")
+	if !postInit.IsValid() {
+		return
 	}
+
+	checkInInjectedMethod(postInit)
+
+	postInitType := postInit.Type()
+
+	if numOut := postInitType.NumOut(); numOut != 0 {
+		panic(fmt.Errorf("The method should return nothing (found %d outputs).", numOut))
+	}
+
+	self.callInjected(container, postInit)
 
 }
 

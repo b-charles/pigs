@@ -7,9 +7,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	. "github.com/l3eegbee/pigs/config"
-	. "github.com/l3eegbee/pigs/config/confsources/programmatic"
-	_ "github.com/l3eegbee/pigs/config/init"
-	"github.com/l3eegbee/pigs/ioc"
 )
 
 func TestConfig(t *testing.T) {
@@ -17,38 +14,53 @@ func TestConfig(t *testing.T) {
 	RunSpecs(t, "Config Suite")
 }
 
-var _ = Describe("Configuration", func() {
+type Cfg struct {
+	Priority int
+	Env      map[string]string
+}
 
-	BeforeEach(func() {
-		ioc.ClearTests()
-	})
+func NewCfg(priority int) *Cfg {
+	return &Cfg{
+		Priority: priority,
+		Env:      make(map[string]string),
+	}
+}
+
+func (self *Cfg) Put(key, value string) *Cfg {
+	self.Env[key] = value
+	return self
+}
+
+func (self *Cfg) GetPriority() int {
+	return self.Priority
+}
+
+func (self *Cfg) LoadEnv() map[string]string {
+	return self.Env
+}
+
+var _ = Describe("Configuration", func() {
 
 	Describe("Injection and merge", func() {
 
 		It("Should get a simple source", func() {
 
-			SetEnvForTests(map[string]string{
-				"hello": "world",
-			})
+			cfg := NewCfg(10).Put("hello", "world")
 
-			config := ioc.GetComponent("Configuration").(*Configuration)
+			config := CreateConfiguration([]ConfigSource{cfg})
 
-			Expect(config.GetEnv()).Should(HaveKeyWithValue("hello", "world"))
+			Expect(config).Should(HaveKeyWithValue("hello", "world"))
 
 		})
 
 		It("Should merge multiple sources", func() {
 
-			SetEnvForTestsWithPriority(1, map[string]string{
-				"hello": "bob",
-			})
-			SetEnvForTestsWithPriority(0, map[string]string{
-				"hello": "world",
-			})
+			cfg1 := NewCfg(20).Put("hello", "bob")
+			cfg2 := NewCfg(10).Put("hello", "world")
 
-			config := ioc.GetComponent("Configuration").(*Configuration)
+			config := CreateConfiguration([]ConfigSource{cfg1, cfg2})
 
-			Expect(config.GetEnv()).Should(HaveKeyWithValue("hello", "bob"))
+			Expect(config).Should(HaveKeyWithValue("hello", "bob"))
 
 		})
 
@@ -58,31 +70,29 @@ var _ = Describe("Configuration", func() {
 
 		It("Should resolve simple placeholder", func() {
 
-			SetEnvForTests(map[string]string{
-				"name":   "Batman",
-				"whoami": "I'm ${name}",
-			})
+			cfg := NewCfg(10)
+			cfg.Put("name", "Batman")
+			cfg.Put("whoami", "I'm ${name}")
 
-			config := ioc.GetComponent("Configuration").(*Configuration)
+			config := CreateConfiguration([]ConfigSource{cfg})
 
-			Expect(config.GetEnv()).Should(HaveKeyWithValue("whoami", "I'm Batman"))
+			Expect(config).Should(HaveKeyWithValue("whoami", "I'm Batman"))
 
 		})
 
 		It("Should resolve complex placeholder", func() {
 
-			SetEnvForTests(map[string]string{
-				"egg":             "oeuf",
-				"ham":             "jambon",
-				"cheese":          "fromage",
-				"recipe-complete": "${egg}, ${ham}, ${cheese}",
-				"order":           "complete",
-				"plate":           "${recipe-${order}}",
-			})
+			cfg := NewCfg(10)
+			cfg.Put("egg", "oeuf")
+			cfg.Put("ham", "jambon")
+			cfg.Put("cheese", "fromage")
+			cfg.Put("recipe-complete", "${egg}, ${ham}, ${cheese}")
+			cfg.Put("order", "complete")
+			cfg.Put("plate", "${recipe-${order}}")
 
-			config := ioc.GetComponent("Configuration").(*Configuration)
+			config := CreateConfiguration([]ConfigSource{cfg})
 
-			Expect(config.GetEnv()).Should(HaveKeyWithValue("plate", "oeuf, jambon, fromage"))
+			Expect(config).Should(HaveKeyWithValue("plate", "oeuf, jambon, fromage"))
 
 		})
 

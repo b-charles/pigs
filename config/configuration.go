@@ -20,13 +20,7 @@ type ConfigSource interface {
  * Configuration
  */
 
-type Configuration struct {
-	env map[string]string
-}
-
-func (self *Configuration) GetEnv() map[string]string {
-	return self.env
-}
+type Configuration map[string]string
 
 /*
  * Sort sources by priority
@@ -50,7 +44,7 @@ func (self byPriority) Less(i, j int) bool {
  * Factory
  */
 
-func CreateConfiguration(sources []ConfigSource) *Configuration {
+func CreateConfiguration(sources []ConfigSource) Configuration {
 
 	sort.Sort(byPriority(sources))
 
@@ -70,7 +64,7 @@ func CreateConfiguration(sources []ConfigSource) *Configuration {
 		}
 	}
 
-	return &Configuration{env}
+	return env
 
 }
 

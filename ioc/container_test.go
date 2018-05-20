@@ -31,8 +31,10 @@ type InjectedStruct struct {
 	SimpleStruct *SimpleStruct
 }
 
-func InjectedStructFactory(simpleStruct *SimpleStruct) *InjectedStruct {
-	return &InjectedStruct{simpleStruct}
+func InjectedStructFactory(injected struct {
+	SimpleStruct *SimpleStruct `inject:"A"`
+}) *InjectedStruct {
+	return &InjectedStruct{injected.SimpleStruct}
 }
 
 // Class SliceInjectedStruct
@@ -41,8 +43,10 @@ type SliceInjectedStruct struct {
 	SimpleStructs []*SimpleStruct
 }
 
-func SliceInjectedStructFactory(simpleStructs []*SimpleStruct) *SliceInjectedStruct {
-	return &SliceInjectedStruct{simpleStructs}
+func SliceInjectedStructFactory(injected struct {
+	SimpleStructs []*SimpleStruct `inject:"A"`
+}) *SliceInjectedStruct {
+	return &SliceInjectedStruct{injected.SimpleStructs}
 }
 
 // Class MapInjectedStruct
@@ -51,8 +55,10 @@ type MapInjectedStruct struct {
 	SimpleStructs map[string]*SimpleStruct
 }
 
-func MapInjectedStructFactory(simpleStructs map[string]*SimpleStruct) *MapInjectedStruct {
-	return &MapInjectedStruct{simpleStructs}
+func MapInjectedStructFactory(injected struct {
+	SimpleStructs map[string]*SimpleStruct `inject:"A"`
+}) *MapInjectedStruct {
+	return &MapInjectedStruct{injected.SimpleStructs}
 }
 
 // Class InterfaceInjectedStruct
@@ -61,8 +67,10 @@ type InterfaceInjectedStruct struct {
 	Doer SomethingDoer
 }
 
-func InterfaceInjectedStructFactory(doer SomethingDoer) *InterfaceInjectedStruct {
-	return &InterfaceInjectedStruct{doer}
+func InterfaceInjectedStructFactory(injected struct {
+	Doer SomethingDoer `inject:"A"`
+}) *InterfaceInjectedStruct {
+	return &InterfaceInjectedStruct{injected.Doer}
 }
 
 type InterfaceInjectedObject struct {
@@ -79,8 +87,10 @@ type InterfaceSliceInjectedStruct struct {
 	Doers []SomethingDoer
 }
 
-func InterfaceSliceInjectedStructFactory(doers []SomethingDoer) *InterfaceSliceInjectedStruct {
-	return &InterfaceSliceInjectedStruct{doers}
+func InterfaceSliceInjectedStructFactory(injected struct {
+	Doers []SomethingDoer `inject:"A"`
+}) *InterfaceSliceInjectedStruct {
+	return &InterfaceSliceInjectedStruct{injected.Doers}
 }
 
 type InterfaceSliceInjectedObject struct {
@@ -93,8 +103,10 @@ type InterfaceMapInjectedStruct struct {
 	Doers map[string]SomethingDoer
 }
 
-func InterfaceMapInjectedStructFactory(doers map[string]SomethingDoer) *InterfaceMapInjectedStruct {
-	return &InterfaceMapInjectedStruct{doers}
+func InterfaceMapInjectedStructFactory(injected struct {
+	Doers map[string]SomethingDoer `inject:"A"`
+}) *InterfaceMapInjectedStruct {
+	return &InterfaceMapInjectedStruct{injected.Doers}
 }
 
 type InterfaceMapInjectedObject struct {
@@ -170,11 +182,19 @@ func NewMap(key, value string) MyMap {
 }
 func (self MyMap) GetMap() map[string]string { return self }
 
+func CreateWrapMap(injected struct {
+	Map MyMap `inject:"MyMap"`
+}) MyMap {
+	return injected.Map
+}
+
 type MySuperMap map[string]string
 
-func CreateSuperMap(maps []MapProvider) MySuperMap {
+func CreateSuperMap(injected struct {
+	Maps []MapProvider `inject:"Maps"`
+}) MySuperMap {
 	super := make(map[string]string, 0)
-	for _, m := range maps {
+	for _, m := range injected.Maps {
 		for k, v := range m.GetMap() {
 			super[k] = v
 		}
@@ -184,9 +204,11 @@ func CreateSuperMap(maps []MapProvider) MySuperMap {
 
 type MyHyperMap map[string]string
 
-func CreateHyperMap(maps map[string]MapProvider) MyHyperMap {
+func CreateHyperMap(injected struct {
+	Maps map[string]MapProvider `inject:"Maps"`
+}) MyHyperMap {
 	hyper := make(map[string]string, 0)
-	for name, m := range maps {
+	for name, m := range injected.Maps {
 		for k, v := range m.GetMap() {
 			hyper[name+"."+k] = v
 		}
@@ -218,7 +240,7 @@ var _ = Describe("Container", func() {
 
 		It("should create a component without dependency", func() {
 
-			container.PutFactory(SimpleStructFactory("A"), []string{}, "A")
+			container.PutFactory(SimpleStructFactory("A"), "A")
 
 			a := container.GetComponent("A").(*SimpleStruct)
 
@@ -232,8 +254,8 @@ var _ = Describe("Container", func() {
 
 				It("should create a component with a dependency", func() {
 
-					container.PutFactory(SimpleStructFactory("A"), []string{}, "A")
-					container.PutFactory(InjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(SimpleStructFactory("A"), "A")
+					container.PutFactory(InjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*InjectedStruct)
 
@@ -245,10 +267,10 @@ var _ = Describe("Container", func() {
 
 					container.PutFactory(func() *SimpleStruct {
 						return nil
-					}, []string{}, "NIL", "A")
+					}, "NIL", "A")
 
-					container.PutFactory(SimpleStructFactory("NOT_NIL"), []string{}, "NOT_NIL", "A")
-					container.PutFactory(InjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(SimpleStructFactory("NOT_NIL"), "NOT_NIL", "A")
+					container.PutFactory(InjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*InjectedStruct)
 
@@ -258,10 +280,10 @@ var _ = Describe("Container", func() {
 
 				It("should inject test component if provided", func() {
 
-					container.PutFactory(SimpleStructFactory("A"), []string{}, "A")
-					container.PutFactory(InjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(SimpleStructFactory("A"), "A")
+					container.PutFactory(InjectedStructFactory, "B")
 
-					container.TestPutFactory(SimpleStructFactory("TEST"), []string{}, "TEST", "A")
+					container.TestPutFactory(SimpleStructFactory("TEST"), "TEST", "A")
 
 					b := container.GetComponent("B").(*InjectedStruct)
 
@@ -271,7 +293,7 @@ var _ = Describe("Container", func() {
 
 				It("should panic if no component is provided", func() {
 
-					container.PutFactory(InjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(InjectedStructFactory, "B")
 
 					Expect(func() {
 						_ = container.GetComponent("B")
@@ -281,9 +303,9 @@ var _ = Describe("Container", func() {
 
 				It("should panic if many components are provided", func() {
 
-					container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "A")
-					container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "A")
-					container.PutFactory(InjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
+					container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
+					container.PutFactory(InjectedStructFactory, "B")
 
 					Expect(func() {
 						_ = container.GetComponent("B")
@@ -297,8 +319,8 @@ var _ = Describe("Container", func() {
 
 				It("should create a component with a dependency", func() {
 
-					container.PutFactory(SimpleStructFactory("A"), []string{}, "A")
-					container.PutFactory(InterfaceInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(SimpleStructFactory("A"), "A")
+					container.PutFactory(InterfaceInjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*InterfaceInjectedStruct)
 
@@ -310,10 +332,10 @@ var _ = Describe("Container", func() {
 
 					container.PutFactory(func() *SimpleStruct {
 						return nil
-					}, []string{}, "NIL", "A")
+					}, "NIL", "A")
 
-					container.PutFactory(SimpleStructFactory("NOT_NIL"), []string{}, "NOT_NIL", "A")
-					container.PutFactory(InterfaceInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(SimpleStructFactory("NOT_NIL"), "NOT_NIL", "A")
+					container.PutFactory(InterfaceInjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*InterfaceInjectedStruct)
 
@@ -323,10 +345,10 @@ var _ = Describe("Container", func() {
 
 				It("should inject test component if provided", func() {
 
-					container.PutFactory(SimpleStructFactory("A"), []string{}, "A")
-					container.PutFactory(InterfaceInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(SimpleStructFactory("A"), "A")
+					container.PutFactory(InterfaceInjectedStructFactory, "B")
 
-					container.TestPutFactory(SimpleStructFactory("TEST"), []string{}, "TEST", "A")
+					container.TestPutFactory(SimpleStructFactory("TEST"), "TEST", "A")
 
 					b := container.GetComponent("B").(*InterfaceInjectedStruct)
 
@@ -336,7 +358,7 @@ var _ = Describe("Container", func() {
 
 				It("should panic if no component is provided", func() {
 
-					container.PutFactory(InterfaceInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(InterfaceInjectedStructFactory, "B")
 
 					Expect(func() {
 						_ = container.GetComponent("B")
@@ -346,9 +368,9 @@ var _ = Describe("Container", func() {
 
 				It("should panic if many components are provided", func() {
 
-					container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "A")
-					container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "A")
-					container.PutFactory(InterfaceInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
+					container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
+					container.PutFactory(InterfaceInjectedStructFactory, "B")
 
 					Expect(func() {
 						_ = container.GetComponent("B")
@@ -360,12 +382,12 @@ var _ = Describe("Container", func() {
 
 			It("should restore 'core' configuration after a TestClear", func() {
 
-				container.PutFactory(SimpleStructFactory("A"), []string{}, "A")
-				container.PutFactory(InjectedStructFactory, []string{"A"}, "B")
+				container.PutFactory(SimpleStructFactory("A"), "A")
+				container.PutFactory(InjectedStructFactory, "B")
 
 				// test
 
-				container.TestPutFactory(SimpleStructFactory("TEST"), []string{}, "TEST", "A")
+				container.TestPutFactory(SimpleStructFactory("TEST"), "TEST", "A")
 
 				b := container.GetComponent("B").(*InjectedStruct)
 
@@ -391,11 +413,11 @@ var _ = Describe("Container", func() {
 
 				It("should create a component with auto-discovery", func() {
 
-					container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "A")
-					container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "A")
-					container.PutFactory(SimpleStructFactory("A3"), []string{}, "A3", "A")
+					container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
+					container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
+					container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
 
-					container.PutFactory(SliceInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(SliceInjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*SliceInjectedStruct)
 
@@ -410,13 +432,13 @@ var _ = Describe("Container", func() {
 
 					container.PutFactory(func() *SimpleStruct {
 						return nil
-					}, []string{}, "NIL", "A")
+					}, "NIL", "A")
 
-					container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "A")
-					container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "A")
-					container.PutFactory(SimpleStructFactory("A3"), []string{}, "A3", "A")
+					container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
+					container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
+					container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
 
-					container.PutFactory(SliceInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(SliceInjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*SliceInjectedStruct)
 
@@ -429,27 +451,17 @@ var _ = Describe("Container", func() {
 
 				It("should inject test component if provided", func() {
 
-					container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "A")
-					container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "A")
-					container.PutFactory(SimpleStructFactory("A3"), []string{}, "A3", "A")
+					container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
+					container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
+					container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
 
-					container.TestPutFactory(SimpleStructFactory("TEST"), []string{}, "TEST", "A")
+					container.TestPutFactory(SimpleStructFactory("TEST"), "TEST", "A")
 
-					container.PutFactory(SliceInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(SliceInjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*SliceInjectedStruct)
 
 					Expect(b.SimpleStructs).Should(ConsistOf(&SimpleStruct{"TEST"}))
-
-				})
-
-				It("should inject empty slice if no component is provided", func() {
-
-					container.PutFactory(SliceInjectedStructFactory, []string{"A"}, "B")
-
-					b := container.GetComponent("B").(*SliceInjectedStruct)
-
-					Expect(b.SimpleStructs).Should(BeEmpty())
 
 				})
 
@@ -459,11 +471,11 @@ var _ = Describe("Container", func() {
 
 				It("should create a component with auto-discovery", func() {
 
-					container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "A")
-					container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "A")
-					container.PutFactory(SimpleStructFactory("A3"), []string{}, "A3", "A")
+					container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
+					container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
+					container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
 
-					container.PutFactory(InterfaceSliceInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(InterfaceSliceInjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*InterfaceSliceInjectedStruct)
 
@@ -478,13 +490,13 @@ var _ = Describe("Container", func() {
 
 					container.PutFactory(func() *SimpleStruct {
 						return nil
-					}, []string{}, "NIL", "A")
+					}, "NIL", "A")
 
-					container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "A")
-					container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "A")
-					container.PutFactory(SimpleStructFactory("A3"), []string{}, "A3", "A")
+					container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
+					container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
+					container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
 
-					container.PutFactory(InterfaceSliceInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(InterfaceSliceInjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*InterfaceSliceInjectedStruct)
 
@@ -497,27 +509,17 @@ var _ = Describe("Container", func() {
 
 				It("should inject test component if provided", func() {
 
-					container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "A")
-					container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "A")
-					container.PutFactory(SimpleStructFactory("A3"), []string{}, "A3", "A")
+					container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
+					container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
+					container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
 
-					container.TestPutFactory(SimpleStructFactory("TEST"), []string{}, "TEST", "A")
+					container.TestPutFactory(SimpleStructFactory("TEST"), "TEST", "A")
 
-					container.PutFactory(InterfaceSliceInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(InterfaceSliceInjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*InterfaceSliceInjectedStruct)
 
 					Expect(b.Doers).Should(ConsistOf(&SimpleStruct{"TEST"}))
-
-				})
-
-				It("should inject empty slice if no component is provided", func() {
-
-					container.PutFactory(InterfaceSliceInjectedStructFactory, []string{"A"}, "B")
-
-					b := container.GetComponent("B").(*InterfaceSliceInjectedStruct)
-
-					Expect(b.Doers).Should(BeEmpty())
 
 				})
 
@@ -531,11 +533,11 @@ var _ = Describe("Container", func() {
 
 				It("should create a component with auto-discovery", func() {
 
-					container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "A")
-					container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "A")
-					container.PutFactory(SimpleStructFactory("A3"), []string{}, "A3", "A")
+					container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
+					container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
+					container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
 
-					container.PutFactory(MapInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(MapInjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*MapInjectedStruct)
 
@@ -550,13 +552,13 @@ var _ = Describe("Container", func() {
 
 					container.PutFactory(func() *SimpleStruct {
 						return nil
-					}, []string{}, "NIL", "A")
+					}, "NIL", "A")
 
-					container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "A")
-					container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "A")
-					container.PutFactory(SimpleStructFactory("A3"), []string{}, "A3", "A")
+					container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
+					container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
+					container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
 
-					container.PutFactory(MapInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(MapInjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*MapInjectedStruct)
 
@@ -569,28 +571,18 @@ var _ = Describe("Container", func() {
 
 				It("should inject test component if provided", func() {
 
-					container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "A")
-					container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "A")
-					container.PutFactory(SimpleStructFactory("A3"), []string{}, "A3", "A")
+					container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
+					container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
+					container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
 
-					container.TestPutFactory(SimpleStructFactory("TEST"), []string{}, "TEST", "A")
+					container.TestPutFactory(SimpleStructFactory("TEST"), "TEST", "A")
 
-					container.PutFactory(MapInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(MapInjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*MapInjectedStruct)
 
 					Expect(b.SimpleStructs).Should(HaveLen(1))
 					Expect(b.SimpleStructs).Should(HaveKeyWithValue("TEST", &SimpleStruct{"TEST"}))
-
-				})
-
-				It("should inject empty map if no component is provided", func() {
-
-					container.PutFactory(MapInjectedStructFactory, []string{"A"}, "B")
-
-					b := container.GetComponent("B").(*MapInjectedStruct)
-
-					Expect(b.SimpleStructs).Should(BeEmpty())
 
 				})
 
@@ -600,11 +592,11 @@ var _ = Describe("Container", func() {
 
 				It("should create a component with auto-discovery", func() {
 
-					container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "A")
-					container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "A")
-					container.PutFactory(SimpleStructFactory("A3"), []string{}, "A3", "A")
+					container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
+					container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
+					container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
 
-					container.PutFactory(InterfaceMapInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(InterfaceMapInjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*InterfaceMapInjectedStruct)
 
@@ -619,13 +611,13 @@ var _ = Describe("Container", func() {
 
 					container.PutFactory(func() *SimpleStruct {
 						return nil
-					}, []string{}, "NIL", "A")
+					}, "NIL", "A")
 
-					container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "A")
-					container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "A")
-					container.PutFactory(SimpleStructFactory("A3"), []string{}, "A3", "A")
+					container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
+					container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
+					container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
 
-					container.PutFactory(InterfaceMapInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(InterfaceMapInjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*InterfaceMapInjectedStruct)
 
@@ -638,28 +630,18 @@ var _ = Describe("Container", func() {
 
 				It("should inject test component if provided", func() {
 
-					container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "A")
-					container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "A")
-					container.PutFactory(SimpleStructFactory("A3"), []string{}, "A3", "A")
+					container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
+					container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
+					container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
 
-					container.TestPutFactory(SimpleStructFactory("TEST"), []string{}, "TEST", "A")
+					container.TestPutFactory(SimpleStructFactory("TEST"), "TEST", "A")
 
-					container.PutFactory(InterfaceMapInjectedStructFactory, []string{"A"}, "B")
+					container.PutFactory(InterfaceMapInjectedStructFactory, "B")
 
 					b := container.GetComponent("B").(*InterfaceMapInjectedStruct)
 
 					Expect(b.Doers).Should(HaveLen(1))
 					Expect(b.Doers).Should(HaveKeyWithValue("TEST", &SimpleStruct{"TEST"}))
-
-				})
-
-				It("should inject empty map if no component is provided", func() {
-
-					container.PutFactory(InterfaceMapInjectedStructFactory, []string{"A"}, "B")
-
-					b := container.GetComponent("B").(*InterfaceMapInjectedStruct)
-
-					Expect(b.Doers).Should(BeEmpty())
 
 				})
 
@@ -683,7 +665,7 @@ var _ = Describe("Container", func() {
 
 		It("should create a component with a simple dependency", func() {
 
-			container.PutFactory(SimpleStructFactory("A"), []string{}, "A")
+			container.PutFactory(SimpleStructFactory("A"), "A")
 			container.Put(&InterfaceInjectedObject{}, "B")
 
 			b := container.GetComponent("B").(*InterfaceInjectedObject)
@@ -694,7 +676,7 @@ var _ = Describe("Container", func() {
 
 		It("should create a component with a simple dependency defined by name", func() {
 
-			container.PutFactory(SimpleStructFactory("A"), []string{}, "A")
+			container.PutFactory(SimpleStructFactory("A"), "A")
 			container.Put(&NamedInterfaceInjectedObject{}, "B")
 
 			b := container.GetComponent("B").(*NamedInterfaceInjectedObject)
@@ -705,9 +687,9 @@ var _ = Describe("Container", func() {
 
 		It("should create a component with a slice of dependencies", func() {
 
-			container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "Doers")
-			container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "Doers")
-			container.PutFactory(SimpleStructFactory("A3"), []string{}, "A3", "Doers")
+			container.PutFactory(SimpleStructFactory("A1"), "A1", "Doers")
+			container.PutFactory(SimpleStructFactory("A2"), "A2", "Doers")
+			container.PutFactory(SimpleStructFactory("A3"), "A3", "Doers")
 
 			container.Put(&InterfaceSliceInjectedObject{}, "B")
 
@@ -722,9 +704,9 @@ var _ = Describe("Container", func() {
 
 		It("should create a component with a map of dependencies", func() {
 
-			container.PutFactory(SimpleStructFactory("A1"), []string{}, "A1", "Doers")
-			container.PutFactory(SimpleStructFactory("A2"), []string{}, "A2", "Doers")
-			container.PutFactory(SimpleStructFactory("A3"), []string{}, "A3", "Doers")
+			container.PutFactory(SimpleStructFactory("A1"), "A1", "Doers")
+			container.PutFactory(SimpleStructFactory("A2"), "A2", "Doers")
+			container.PutFactory(SimpleStructFactory("A3"), "A3", "Doers")
 
 			container.Put(&InterfaceMapInjectedObject{}, "B")
 
@@ -757,7 +739,7 @@ var _ = Describe("Container", func() {
 
 		It("should call PostInit in the correct order", func() {
 
-			container.PutFactory(NewOrderRegster, []string{}, "OrderRegister")
+			container.PutFactory(NewOrderRegster, "OrderRegister")
 			container.Put(&First{}, "First")
 			container.Put(&Second{}, "Second")
 			container.Put(&Third{}, "Third")
@@ -770,7 +752,7 @@ var _ = Describe("Container", func() {
 
 		It("should call Close in the correct order", func() {
 
-			container.PutFactory(NewOrderRegster, []string{}, "OrderRegister")
+			container.PutFactory(NewOrderRegster, "OrderRegister")
 			container.Put(&First{}, "First")
 			container.Put(&Second{}, "Second")
 			container.Put(&Third{}, "Third")
@@ -800,10 +782,22 @@ var _ = Describe("Container", func() {
 
 		It("should inject not struct components", func() {
 
+			container.Put(NewMap("Hello", "World"), "MyMap")
+			container.PutFactory(CreateWrapMap, "Wrap")
+
+			wrap := container.GetComponent("Wrap").(MyMap)
+
+			Expect(wrap).Should(HaveLen(1))
+			Expect(wrap).Should(HaveKeyWithValue("Hello", "World"))
+
+		})
+
+		It("should inject not struct components in a slice", func() {
+
 			container.Put(NewMap("Hello", "World"), "MyMap1", "Maps")
 			container.Put(NewMap("Hi", "Everybody"), "MyMap2", "Maps")
 
-			container.PutFactory(CreateSuperMap, []string{"Maps"}, "Super")
+			container.PutFactory(CreateSuperMap, "Super")
 
 			super := container.GetComponent("Super").(MySuperMap)
 
@@ -818,7 +812,7 @@ var _ = Describe("Container", func() {
 			container.Put(NewMap("Hello", "World"), "MyMap1", "Maps")
 			container.Put(NewMap("Hi", "Everybody"), "MyMap2", "Maps")
 
-			container.PutFactory(CreateHyperMap, []string{"Maps"}, "Hyper")
+			container.PutFactory(CreateHyperMap, "Hyper")
 
 			hyper := container.GetComponent("Hyper").(MyHyperMap)
 

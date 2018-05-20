@@ -8,8 +8,11 @@ import (
 func init() {
 
 	ioc.PutFactory(
-		func(defaultSources []ConfigSource, sources []ConfigSource) *Configuration {
-			return CreateConfiguration(append(defaultSources, sources...))
-		}, []string{"DefaultConfigSources", "ConfigSources"}, "Configuration")
+		func(injected struct {
+			DefaultSources []ConfigSource
+			ConfigSources  []ConfigSource
+		}) *Configuration {
+			return CreateConfiguration(append(injected.DefaultSources, injected.ConfigSources...))
+		}, "Configuration")
 
 }

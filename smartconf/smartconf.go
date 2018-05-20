@@ -10,9 +10,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+//
 // type Parser interface {
 // 	   Parse(env map[string]string, root string) (interface{}, error)
 // }
+//
+// or
+//
+// type Parser interface {
+// 	   Parse(value string) {interface{}, error)
+// }
+//
 
 var string_type reflect.Type = reflect.TypeOf("")
 var map_string_string_type reflect.Type = reflect.TypeOf(map[string]string{})

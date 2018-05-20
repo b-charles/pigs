@@ -12,8 +12,8 @@ func ContainerInstance() *Container {
 	return instance
 }
 
-func PutFactory(factory interface{}, inputs []string, name string, aliases ...string) bool {
-	ContainerInstance().PutFactory(factory, inputs, name, aliases...)
+func PutFactory(factory interface{}, name string, aliases ...string) bool {
+	ContainerInstance().PutFactory(factory, name, aliases...)
 	return true
 }
 
@@ -22,8 +22,8 @@ func Put(object interface{}, name string, aliases ...string) bool {
 	return true
 }
 
-func TestPutFactory(factory interface{}, inputs []string, name string, aliases ...string) bool {
-	ContainerInstance().TestPutFactory(factory, inputs, name, aliases...)
+func TestPutFactory(factory interface{}, name string, aliases ...string) bool {
+	ContainerInstance().TestPutFactory(factory, name, aliases...)
 	return true
 }
 

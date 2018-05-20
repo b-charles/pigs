@@ -11,6 +11,6 @@ func init() {
 
 		return &afero.Afero{Fs: afero.NewOsFs()}
 
-	}, []string{}, "Filesystem")
+	}, "Filesystem")
 
 }

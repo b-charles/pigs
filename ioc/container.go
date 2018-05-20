@@ -32,12 +32,11 @@ func NewContainer() *Container {
 
 func (self *Container) putIn(
 	factory interface{},
-	inputs []string,
 	name string,
 	aliases []string,
 	components map[string][]*Component) {
 
-	component := NewComponent(factory, inputs, name, aliases)
+	component := NewComponent(factory, name, aliases)
 
 	for _, alias := range component.aliases {
 
@@ -58,20 +57,20 @@ func (self *Container) wrap(object interface{}) func() interface{} {
 	}
 }
 
-func (self *Container) PutFactory(factory interface{}, inputs []string, name string, aliases ...string) {
-	self.putIn(factory, inputs, name, aliases, self.coreComponents)
+func (self *Container) PutFactory(factory interface{}, name string, aliases ...string) {
+	self.putIn(factory, name, aliases, self.coreComponents)
 }
 
 func (self *Container) Put(object interface{}, name string, aliases ...string) {
-	self.PutFactory(self.wrap(object), []string{}, name, aliases...)
+	self.PutFactory(self.wrap(object), name, aliases...)
 }
 
-func (self *Container) TestPutFactory(factory interface{}, inputs []string, name string, aliases ...string) {
-	self.putIn(factory, inputs, name, aliases, self.testComponents)
+func (self *Container) TestPutFactory(factory interface{}, name string, aliases ...string) {
+	self.putIn(factory, name, aliases, self.testComponents)
 }
 
 func (self *Container) TestPut(object interface{}, name string, aliases ...string) {
-	self.TestPutFactory(self.wrap(object), []string{}, name, aliases...)
+	self.TestPutFactory(self.wrap(object), name, aliases...)
 }
 
 // INTERNAL RESOLUTION
