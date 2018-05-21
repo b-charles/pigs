@@ -41,3 +41,18 @@ The librairies are:
 * filesystem: Wrapping of [afero](https://github.com/spf13/afero)
 * config: Configuration collector.
 
+## When Pigs?
+
+One day, maybe. But not before the end of this TODO list:
+* [errors](https://github.com/juju/errors) integration
+* [Logrus](https://github.com/sirupsen/logrus) integration
+* [Iris](https://github.com/kataras/iris) integration, with actuators:
+    * components: complete list of components in IOC module (?)
+    * env: complete configuration map
+    * health
+    * loggers: show and modifies the condfiguation of logger (?)
+    * shutdown
+* Unix signal support
+* [Cobra](https://github.com/spf13/cobra) integration (Maybe)
+* [Viper](https://github.com/spf13/viper) integration (As repacement of configuration? Second level of configuration with dynamic features?)
+
