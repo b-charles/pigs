@@ -34,9 +34,12 @@ func (self *Container) putIn(
 	factory interface{},
 	name string,
 	aliases []string,
-	components map[string][]*Component) {
+	components map[string][]*Component) error {
 
-	component := NewComponent(factory, name, aliases)
+	component, err := NewComponent(factory, name, aliases)
+	if err != nil {
+		return err
+	}
 
 	for _, alias := range component.aliases {
 
@@ -49,6 +52,8 @@ func (self *Container) putIn(
 
 	}
 
+	return nil
+
 }
 
 func (self *Container) wrap(object interface{}) func() interface{} {
@@ -57,79 +62,95 @@ func (self *Container) wrap(object interface{}) func() interface{} {
 	}
 }
 
-func (self *Container) PutFactory(factory interface{}, name string, aliases ...string) {
-	self.putIn(factory, name, aliases, self.coreComponents)
+func (self *Container) PutFactory(factory interface{}, name string, aliases ...string) error {
+	return self.putIn(factory, name, aliases, self.coreComponents)
 }
 
-func (self *Container) Put(object interface{}, name string, aliases ...string) {
-	self.PutFactory(self.wrap(object), name, aliases...)
+func (self *Container) Put(object interface{}, name string, aliases ...string) error {
+	return self.PutFactory(self.wrap(object), name, aliases...)
 }
 
-func (self *Container) TestPutFactory(factory interface{}, name string, aliases ...string) {
-	self.putIn(factory, name, aliases, self.testComponents)
+func (self *Container) TestPutFactory(factory interface{}, name string, aliases ...string) error {
+	return self.putIn(factory, name, aliases, self.testComponents)
 }
 
-func (self *Container) TestPut(object interface{}, name string, aliases ...string) {
-	self.TestPutFactory(self.wrap(object), name, aliases...)
+func (self *Container) TestPut(object interface{}, name string, aliases ...string) error {
+	return self.TestPutFactory(self.wrap(object), name, aliases...)
 }
 
 // INTERNAL RESOLUTION
 
-func (self *Container) getComponentInstance(component *Component) reflect.Value {
+func (self *Container) getComponentInstance(component *Component) (reflect.Value, error) {
 
-	instance, ok := self.instances[component]
-	if ok {
-		return instance
+	if instance, ok := self.instances[component]; ok {
+		return instance, nil
 	}
 
-	instance = component.Instanciate(self)
+	instance, err := component.Instanciate(self)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+
 	self.instances[component] = instance
 
-	component.Initialize(self, instance)
-	component.PostInit(self, instance)
+	if err := component.Initialize(self, instance); err != nil {
+		return reflect.Value{}, err
+	}
+	if err := component.PostInit(self, instance); err != nil {
+		return reflect.Value{}, err
+	}
 
 	self.sorted = append(self.sorted, component)
 
-	return instance
+	return instance, nil
 
 }
 
-func (self *Container) extractInstances(name string, components map[string][]*Component) ([]reflect.Value, []*Component) {
+func (self *Container) extractInstances(name string, components map[string][]*Component) ([]reflect.Value, []*Component, error) {
 
 	list, ok := components[name]
 	if !ok {
-		return []reflect.Value{}, []*Component{}
+		return []reflect.Value{}, []*Component{}, nil
 	}
 
 	instances := make([]reflect.Value, 0, len(list))
 	producers := make([]*Component, 0, len(list))
 
 	for _, component := range list {
-		instance := self.getComponentInstance(component)
+
+		instance, err := self.getComponentInstance(component)
+
+		if err != nil {
+			return instances, producers, err
+		}
+
 		if !instance.IsNil() {
 			instances = append(instances, instance)
 			producers = append(producers, component)
 		}
+
 	}
 
-	return instances, producers
+	return instances, producers, nil
 
 }
 
-func (self *Container) getComponentInstances(name string) ([]reflect.Value, []*Component) {
+func (self *Container) getComponentInstances(name string) ([]reflect.Value, []*Component, error) {
 
-	defer func() {
-		if err, ok := recover().(error); ok {
-			panic(errors.Wrapf(err, "Error during instanciations of '%s'", name))
+	wrap := func(err error) error {
+		if err != nil {
+			return errors.Wrapf(err, "Error during instanciations of '%s'", name)
+		} else {
+			return nil
 		}
-	}()
-
-	instances, producers := self.extractInstances(name, self.testComponents)
-	if len(instances) > 0 {
-		return instances, producers
 	}
 
-	return self.extractInstances(name, self.coreComponents)
+	if instances, producers, err := self.extractInstances(name, self.testComponents); err != nil || len(instances) > 0 {
+		return instances, producers, wrap(err)
+	}
+
+	instances, producers, err := self.extractInstances(name, self.coreComponents)
+	return instances, producers, wrap(err)
 
 }
 
@@ -147,21 +168,24 @@ func (self *Container) convertToInterface(values []reflect.Value) []interface{} 
 }
 
 func (self *Container) GetComponents(name string) []interface{} {
-	values, _ := self.getComponentInstances(name)
-	return self.convertToInterface(values)
+	if values, _, err := self.getComponentInstances(name); err != nil {
+		panic(err)
+	} else {
+		return self.convertToInterface(values)
+	}
 }
 
 func (self *Container) GetComponent(name string) interface{} {
 
-	instances, producers := self.getComponentInstances(name)
-
-	if len(instances) == 0 {
+	if instances, producers, err := self.getComponentInstances(name); err != nil {
+		panic(err)
+	} else if len(instances) == 0 {
 		panic(fmt.Errorf("No producer found for '%s'.", name))
 	} else if len(instances) > 1 {
 		panic(fmt.Errorf("Too many producers found for '%s': %v.", name, producers))
+	} else {
+		return self.convertToInterface(instances)[0]
 	}
-
-	return self.convertToInterface(instances)[0]
 
 }
 

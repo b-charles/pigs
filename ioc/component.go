@@ -23,13 +23,13 @@ type Component struct {
 
 var STRING_TYPE reflect.Type = reflect.TypeOf("")
 
-func checkInInjectedMethod(method reflect.Value) {
+func checkInInjectedMethod(method reflect.Value) error {
 
 	methodType := method.Type()
 
 	numIn := methodType.NumIn()
 	if numIn != 0 && numIn != 1 {
-		panic(fmt.Errorf("The function should take none or one argument (not %d).", numIn))
+		return fmt.Errorf("The function should take none or one argument (not %d).", numIn)
 	}
 
 	if numIn == 1 {
@@ -39,19 +39,22 @@ func checkInInjectedMethod(method reflect.Value) {
 			kindIn = in.Elem().Kind()
 		}
 		if kindIn != reflect.Struct {
-			panic(fmt.Errorf("The function should only take a struct or a pointer to a struct as argument (not a %v)", in))
+			return fmt.Errorf("The function should only take a struct or a pointer to a struct as argument (not a %v)", in)
 		}
 	}
 
+	return nil
+
 }
 
-func NewComponent(factory interface{}, name string, aliases []string) *Component {
+func NewComponent(factory interface{}, name string, aliases []string) (*Component, error) {
 
-	defer func() {
-		if err, ok := recover().(error); ok {
-			panic(errors.Wrapf(err, "Error during registration of '%s'", name))
-		}
-	}()
+	wrap := func(err error) error {
+		return errors.Wrapf(err, "Error during registration of '%s'", name)
+	}
+	wrapf := func(msg string, args ...interface{}) error {
+		return wrap(fmt.Errorf(msg, args...))
+	}
 
 	// get unique aliases
 
@@ -59,7 +62,7 @@ func NewComponent(factory interface{}, name string, aliases []string) *Component
 	uniqueAliases[name] = true
 	for _, alias := range aliases {
 		if _, ok := uniqueAliases[alias]; ok {
-			panic(fmt.Errorf("Alias specified more than once: '%s'.", alias))
+			return nil, wrapf("Alias specified more than once: '%s'.", alias)
 		}
 		uniqueAliases[alias] = true
 	}
@@ -73,19 +76,21 @@ func NewComponent(factory interface{}, name string, aliases []string) *Component
 
 	factoValue := reflect.ValueOf(factory)
 	if factoValue.Kind() != reflect.Func {
-		panic(fmt.Errorf("The factory should be a function, not a %v.", factoValue.Kind()))
+		return nil, wrapf("The factory should be a function, not a %v.", factoValue.Kind())
 	}
 
 	// check in
 
-	checkInInjectedMethod(factoValue)
+	if err := checkInInjectedMethod(factoValue); err != nil {
+		return nil, wrap(err)
+	}
 
 	// check out
 
 	factoType := factoValue.Type()
 
 	if numOut := factoType.NumOut(); numOut != 1 {
-		panic(fmt.Errorf("The output number of the factory should be 1, not %d.", numOut))
+		return nil, wrapf("The output number of the factory should be 1, not %d.", numOut)
 	}
 
 	outKind := factoType.Out(0).Kind()
@@ -95,21 +100,22 @@ func NewComponent(factory interface{}, name string, aliases []string) *Component
 		outKind != reflect.Map &&
 		outKind != reflect.Ptr &&
 		outKind != reflect.Slice {
-		panic(fmt.Errorf("The output type should be a chan, a function, an interface, a map, a pointer or a slice, not a %v.", outKind))
+		return nil, wrapf("The output type should be a chan, a function, an interface, a map, a pointer or a slice, not a %v.", outKind)
 	}
 
 	// return
 
-	return &Component{name, allAliases, factoValue}
+	return &Component{name, allAliases, factoValue}, nil
 
 }
 
-func (self *Component) resolve(container *Container, name string, class reflect.Type) reflect.Value {
+func (self *Component) resolve(container *Container, name string, class reflect.Type) (reflect.Value, error) {
 
-	instances, producers := container.getComponentInstances(name)
-
-	if len(instances) == 0 {
-		panic(fmt.Errorf("No producer found for '%s'.", name))
+	instances, producers, err := container.getComponentInstances(name)
+	if err != nil {
+		return reflect.Value{}, err
+	} else if len(instances) == 0 {
+		return reflect.Value{}, fmt.Errorf("No producer found for '%s'.", name)
 	}
 
 	if instanceType := instances[0].Type(); !instanceType.AssignableTo(class) {
@@ -121,7 +127,7 @@ func (self *Component) resolve(container *Container, name string, class reflect.
 			slice := reflect.MakeSlice(reflect.SliceOf(class), 0, len(instances))
 			slice = reflect.Append(slice, instances...)
 
-			return slice
+			return slice, nil
 
 		} else if class.Kind() == reflect.Map {
 
@@ -136,21 +142,21 @@ func (self *Component) resolve(container *Container, name string, class reflect.
 				m.SetMapIndex(reflect.ValueOf(producers[i].name), instances[i])
 			}
 
-			return m
+			return m, nil
 
 		}
 
 	}
 
 	if len(instances) > 1 {
-		panic(fmt.Errorf("Too many producers found for '%s': %v.", name, producers))
+		return reflect.Value{}, fmt.Errorf("Too many producers found for '%s': %v.", name, producers)
 	}
 
-	return instances[0]
+	return instances[0], nil
 
 }
 
-func (self *Component) inject(container *Container, value reflect.Value, onlyTagged bool) {
+func (self *Component) inject(container *Container, value reflect.Value, onlyTagged bool) error {
 
 	class := value.Type()
 
@@ -169,16 +175,28 @@ func (self *Component) inject(container *Container, value reflect.Value, onlyTag
 		}
 
 		if !field.CanSet() {
-			panic(fmt.Errorf("The field %v of %v is not settable.", fieldType, class))
+			return fmt.Errorf("The field %v of %v is not settable.", fieldType, class)
 		}
 
-		field.Set(self.resolve(container, name, fieldType.Type))
+		if val, err := self.resolve(container, name, fieldType.Type); err != nil {
+			return err
+		} else {
+			field.Set(val)
+		}
 
 	}
 
+	return nil
+
 }
 
-func (self *Component) callInjected(container *Container, method reflect.Value) []reflect.Value {
+func (self *Component) callInjected(container *Container, method reflect.Value) (out []reflect.Value, err error) {
+
+	defer func() {
+		if r, ok := recover().(error); ok {
+			err = errors.Wrapf(r, "Error during calling %v", method)
+		}
+	}()
 
 	methodType := method.Type()
 
@@ -195,7 +213,9 @@ func (self *Component) callInjected(container *Container, method reflect.Value) 
 
 		arg := reflect.New(argType).Elem()
 
-		self.inject(container, arg, false)
+		if err = self.inject(container, arg, false); err != nil {
+			return
+		}
 
 		if ptr {
 			arg = arg.Addr()
@@ -205,57 +225,53 @@ func (self *Component) callInjected(container *Container, method reflect.Value) 
 
 	}
 
-	return method.Call(args)
+	return method.Call(args), nil
 
 }
 
-func (self *Component) Instanciate(container *Container) reflect.Value {
+func (self *Component) Instanciate(container *Container) (reflect.Value, error) {
 
-	defer func() {
-		if err, ok := recover().(error); ok {
-			panic(errors.Wrapf(err, "Error during instanciation of '%s'", self.name))
-		}
-	}()
+	out, err := self.callInjected(container, self.factory)
+	if err != nil {
+		return reflect.Value{}, errors.Wrapf(err, "Error during instanciation of '%s'", self.name)
+	}
 
-	instance := self.callInjected(container, self.factory)[0]
+	instance := out[0]
 	if instance.Kind() == reflect.Interface {
 		instance = instance.Elem()
 	}
 
-	return instance
+	return instance, nil
 
 }
 
-func (self *Component) Initialize(container *Container, instance reflect.Value) {
-
-	defer func() {
-		if err, ok := recover().(error); ok {
-			panic(errors.Wrapf(err, "Error during initialisation of '%s'", self.name))
-		}
-	}()
+func (self *Component) Initialize(container *Container, instance reflect.Value) error {
 
 	if instance.IsNil() {
-		return
+		return nil
 	}
 	if instance.Kind() == reflect.Ptr {
 		instance = instance.Elem()
 	}
 	if instance.Kind() != reflect.Struct {
-		return
+		return nil
 	}
 
-	self.inject(container, instance, true)
+	err := self.inject(container, instance, true)
+	return errors.Wrapf(err, "Error during initialisation of '%s'", self.name)
 
 }
 
-func (self *Component) PostInit(container *Container, instance reflect.Value) {
+func (self *Component) PostInit(container *Container, instance reflect.Value) error {
 
 	postInit := instance.MethodByName("PostInit")
 	if !postInit.IsValid() {
-		return
+		return nil
 	}
 
-	checkInInjectedMethod(postInit)
+	if err := checkInInjectedMethod(postInit); err != nil {
+		return err
+	}
 
 	postInitType := postInit.Type()
 
@@ -263,7 +279,8 @@ func (self *Component) PostInit(container *Container, instance reflect.Value) {
 		panic(fmt.Errorf("The method should return nothing (found %d outputs).", numOut))
 	}
 
-	self.callInjected(container, postInit)
+	_, err := self.callInjected(container, postInit)
+	return errors.Wrapf(err, "Error during post-initialization of '%s'", self.name)
 
 }
 
