@@ -1,26 +1,29 @@
 package ioc
 
 import (
-	"fmt"
 	"reflect"
 
 	"github.com/pkg/errors"
 )
 
+// CONTAINER
+
 type Container struct {
 	coreComponents map[string][]*Component
 	testComponents map[string][]*Component
-	instances      map[*Component]reflect.Value
-	sorted         []*Component
+	instances      map[*Component]*Instance
+	sorted         []*Instance
 }
 
+// NewContainer creates a pointer to new Container. This new container contains
+// already one component: itself with the name 'ApplicationContainer'.
 func NewContainer() *Container {
 
 	container := &Container{
 		make(map[string][]*Component),
 		make(map[string][]*Component),
-		make(map[*Component]reflect.Value),
-		make([]*Component, 0)}
+		make(map[*Component]*Instance),
+		make([]*Instance, 0)}
 
 	container.Put(container, "ApplicationContainer")
 
@@ -28,8 +31,10 @@ func NewContainer() *Container {
 
 }
 
-// PUT
+// REGISTRATION
 
+// putIn creates a Component (by its factory, name and aliases) and put it in
+// the given map.
 func (self *Container) putIn(
 	factory interface{},
 	name string,
@@ -56,148 +61,335 @@ func (self *Container) putIn(
 
 }
 
+// wrap convert an object into a function which returns this object.
 func (self *Container) wrap(object interface{}) func() interface{} {
 	return func() interface{} {
 		return object
 	}
 }
 
+// PutFactory records a new Component by its factory.
 func (self *Container) PutFactory(factory interface{}, name string, aliases ...string) error {
 	return self.putIn(factory, name, aliases, self.coreComponents)
 }
 
+// Put records a new Component by its value.
 func (self *Container) Put(object interface{}, name string, aliases ...string) error {
 	return self.PutFactory(self.wrap(object), name, aliases...)
 }
 
+// PutFactory records a new Component for tests by its factory.
 func (self *Container) TestPutFactory(factory interface{}, name string, aliases ...string) error {
 	return self.putIn(factory, name, aliases, self.testComponents)
 }
 
+// Put records a new Component for tests by its value.
 func (self *Container) TestPut(object interface{}, name string, aliases ...string) error {
 	return self.TestPutFactory(self.wrap(object), name, aliases...)
 }
 
 // INTERNAL RESOLUTION
 
-func (self *Container) getComponentInstance(component *Component) (reflect.Value, error) {
+// getComponentInstance gets the instance of the given component. If the
+// instance is already created, the instance is returned. If not, the instance is
+// created, recorded, initialized, post-initialized and returned.
+func (self *Container) getComponentInstance(component *Component) (*Instance, error) {
 
 	if instance, ok := self.instances[component]; ok {
 		return instance, nil
 	}
 
-	instance, err := component.Instanciate(self)
+	instance, err := component.instanciate(self)
 	if err != nil {
-		return reflect.Value{}, err
+		return instance, err
 	}
 
 	self.instances[component] = instance
 
-	if err := component.Initialize(self, instance); err != nil {
-		return reflect.Value{}, err
+	if err := instance.initialize(self); err != nil {
+		return instance, err
 	}
-	if err := component.PostInit(self, instance); err != nil {
-		return reflect.Value{}, err
+	if err := instance.postInit(self); err != nil {
+		return instance, err
 	}
 
-	self.sorted = append(self.sorted, component)
+	self.sorted = append(self.sorted, instance)
 
 	return instance, nil
 
 }
 
-func (self *Container) extractInstances(name string, components map[string][]*Component) ([]reflect.Value, []*Component, error) {
+// extractInstances get not nil instances from a name and a map of Components.
+func (self *Container) extractInstances(name string, components map[string][]*Component) ([]*Instance, error) {
 
 	list, ok := components[name]
 	if !ok {
-		return []reflect.Value{}, []*Component{}, nil
+		return []*Instance{}, nil
 	}
 
-	instances := make([]reflect.Value, 0, len(list))
-	producers := make([]*Component, 0, len(list))
+	instances := make([]*Instance, 0, len(list))
 
 	for _, component := range list {
 
 		instance, err := self.getComponentInstance(component)
-
 		if err != nil {
-			return instances, producers, err
+			return instances, err
 		}
 
-		if !instance.IsNil() {
+		if !instance.isNil() {
 			instances = append(instances, instance)
-			producers = append(producers, component)
 		}
 
 	}
 
-	return instances, producers, nil
+	return instances, nil
 
 }
 
-func (self *Container) getComponentInstances(name string) ([]reflect.Value, []*Component, error) {
+// getComponentInstances get the instance from the test map Component, or the
+// core map if nothing is found.
+func (self *Container) getComponentInstances(name string) ([]*Instance, error) {
 
 	wrap := func(err error) error {
-		if err != nil {
-			return errors.Wrapf(err, "Error during instanciations of '%s'", name)
-		} else {
-			return nil
+		return errors.Wrapf(err, "Error during instanciations of '%s'", name)
+	}
+
+	if instances, err := self.extractInstances(name, self.testComponents); err != nil || len(instances) > 0 {
+		return instances, wrap(err)
+	}
+
+	instances, err := self.extractInstances(name, self.coreComponents)
+	return instances, wrap(err)
+
+}
+
+// INJECTION
+
+var string_type reflect.Type = reflect.TypeOf("")
+
+// resolve get Components with the given name and construct a value of the
+// given type.
+func (self *Container) resolve(name string, class reflect.Type) (reflect.Value, error) {
+
+	instances, err := self.getComponentInstances(name)
+	if err != nil {
+		return reflect.Value{}, err
+	} else if len(instances) == 0 {
+		return reflect.Value{}, errors.Errorf("No producer found for '%s'.", name)
+	}
+
+	if instanceType := instances[0].value.Type(); !instanceType.AssignableTo(class) {
+
+		if class.Kind() == reflect.Slice {
+
+			class = class.Elem()
+
+			slice := reflect.MakeSlice(reflect.SliceOf(class), 0, len(instances))
+			for _, instance := range instances {
+				slice = reflect.Append(slice, instance.value)
+			}
+
+			return slice, nil
+
+		} else if class.Kind() == reflect.Map {
+
+			if keyClass := class.Key(); keyClass != string_type {
+				return reflect.Value{}, errors.Errorf("Unsupported key type for a map injection: %v, only 'string' is valid.", keyClass)
+			}
+
+			class = class.Elem()
+
+			m := reflect.MakeMapWithSize(reflect.MapOf(string_type, class), len(instances))
+			for _, instance := range instances {
+				m.SetMapIndex(reflect.ValueOf(instance.producer.name), instance.value)
+			}
+
+			return m, nil
+
 		}
+
 	}
 
-	if instances, producers, err := self.extractInstances(name, self.testComponents); err != nil || len(instances) > 0 {
-		return instances, producers, wrap(err)
+	if len(instances) > 1 {
+
+		producers := make([]*Component, 0)
+		for _, instance := range instances {
+			producers = append(producers, instance.producer)
+		}
+
+		return reflect.Value{}, errors.Errorf("Too many producers found for '%s': %v.", name, producers)
+
 	}
 
-	instances, producers, err := self.extractInstances(name, self.coreComponents)
-	return instances, producers, wrap(err)
+	return instances[0].value, nil
+
+}
+
+// inject each field of a value, only if the value is a struct or a pointer to
+// a struct.
+func (self *Container) inject(value reflect.Value, onlyTagged bool) error {
+
+	if value.Kind() == reflect.Ptr {
+		value = value.Elem()
+	}
+	if value.Kind() != reflect.Struct {
+		return nil
+	}
+
+	class := value.Type()
+
+	for i := 0; i < value.NumField(); i++ {
+
+		field := value.Field(i)
+		fieldType := class.Field(i)
+
+		name, ok := fieldType.Tag.Lookup("inject")
+		if !ok && onlyTagged {
+			continue
+		}
+
+		if name == "" {
+			name = fieldType.Name
+		}
+
+		if !field.CanSet() {
+			return errors.Errorf("The field %v of %v is not settable.", fieldType, class)
+		}
+
+		if val, err := self.resolve(name, fieldType.Type); err != nil {
+			return err
+		} else {
+			field.Set(val)
+		}
+
+	}
+
+	return nil
+
+}
+
+// recoveredCall calls a method and recover in case of panic.
+func recoveredCall(method reflect.Value, args []reflect.Value) (out []reflect.Value, err error) {
+
+	defer func() {
+		if r, ok := recover().(error); ok {
+			err = errors.Wrapf(r, "Error while calling %v", method)
+		}
+	}()
+
+	return method.Call(args), nil
+
+}
+
+// callInjected call the given method, injecting its arguments.
+func (self *Container) callInjected(method reflect.Value) ([]reflect.Value, error) {
+
+	if method.Kind() != reflect.Func {
+		return []reflect.Value{}, errors.Errorf("The argument is not a function: %v", method)
+	}
+
+	methodType := method.Type()
+
+	numIn := methodType.NumIn()
+	args := make([]reflect.Value, numIn)
+
+	out := []reflect.Value{}
+
+	injected := false
+
+	if numIn == 1 {
+
+		argType := methodType.In(0)
+
+		ptr := argType.Kind() == reflect.Ptr
+		if ptr {
+			argType = argType.Elem()
+		}
+
+		name := argType.Name()
+		_, testPresence := self.testComponents[name]
+		_, corePresence := self.coreComponents[name]
+		if !testPresence && !corePresence {
+
+			arg := reflect.New(argType).Elem()
+
+			if err := self.inject(arg, false); err != nil {
+				return out, err
+			}
+
+			if ptr {
+				arg = arg.Addr()
+			}
+
+			args[0] = arg
+
+			injected = true
+
+		}
+
+	}
+
+	if !injected {
+
+		for i := 0; i < numIn; i++ {
+
+			argType := methodType.In(i)
+
+			argName := argType.Name()
+			if argType.Kind() == reflect.Ptr {
+				argName = argType.Elem().Name()
+			}
+
+			if resolved, err := self.resolve(argName, argType); err != nil {
+				return out, err
+			} else {
+				args[i] = resolved
+			}
+
+		}
+
+	}
+
+	return recoveredCall(method, args)
 
 }
 
 // EXTERNAL RESOLUTION
 
-func (self *Container) convertToInterface(values []reflect.Value) []interface{} {
+// CallInjected call the given method, injecting its arguments.
+func (self *Container) CallInjected(method interface{}) error {
 
-	instances := make([]interface{}, 0, len(values))
-	for _, value := range values {
-		instances = append(instances, value.Interface())
+	out, err := self.callInjected(reflect.ValueOf(method))
+	if err != nil {
+		return err
 	}
 
-	return instances
-
-}
-
-func (self *Container) GetComponents(name string) []interface{} {
-	if values, _, err := self.getComponentInstances(name); err != nil {
-		panic(err)
-	} else {
-		return self.convertToInterface(values)
+	if len(out) == 1 {
+		if err, ok := out[0].Interface().(error); !ok {
+			return errors.Errorf("The output of the method should be an error, not a '%v'.", out[0].Type())
+		} else if err != nil {
+			return err
+		}
 	}
-}
 
-func (self *Container) GetComponent(name string) interface{} {
-
-	if instances, producers, err := self.getComponentInstances(name); err != nil {
-		panic(err)
-	} else if len(instances) == 0 {
-		panic(fmt.Errorf("No producer found for '%s'.", name))
-	} else if len(instances) > 1 {
-		panic(fmt.Errorf("Too many producers found for '%s': %v.", name, producers))
-	} else {
-		return self.convertToInterface(instances)[0]
+	if len(out) > 1 {
+		return errors.Errorf("The method should return none or one output, not %d.", len(out))
 	}
+
+	return nil
 
 }
 
 // CLOSE
 
+// Close close all components.
 func (self *Container) Close() {
 
-	for _, component := range self.sorted {
+	for _, instance := range self.sorted {
 
-		component.Close(self, self.instances[component])
+		instance.close(self)
 
-		delete(self.instances, component)
+		delete(self.instances, instance.producer)
 
 	}
 
@@ -205,6 +397,7 @@ func (self *Container) Close() {
 
 }
 
+// ClearTests close all components and delete all registered Component for tests.
 func (self *Container) ClearTests() {
 
 	self.Close()

@@ -12,32 +12,24 @@ func ContainerInstance() *Container {
 	return instance
 }
 
-func PutFactory(factory interface{}, name string, aliases ...string) bool {
-	ContainerInstance().PutFactory(factory, name, aliases...)
-	return true
+func PutFactory(factory interface{}, name string, aliases ...string) error {
+	return ContainerInstance().PutFactory(factory, name, aliases...)
 }
 
-func Put(object interface{}, name string, aliases ...string) bool {
-	ContainerInstance().Put(object, name, aliases...)
-	return true
+func Put(object interface{}, name string, aliases ...string) error {
+	return ContainerInstance().Put(object, name, aliases...)
 }
 
-func TestPutFactory(factory interface{}, name string, aliases ...string) bool {
-	ContainerInstance().TestPutFactory(factory, name, aliases...)
-	return true
+func TestPutFactory(factory interface{}, name string, aliases ...string) error {
+	return ContainerInstance().TestPutFactory(factory, name, aliases...)
 }
 
-func TestPut(object interface{}, name string, aliases ...string) bool {
-	ContainerInstance().TestPut(object, name, aliases...)
-	return true
+func TestPut(object interface{}, name string, aliases ...string) error {
+	return ContainerInstance().TestPut(object, name, aliases...)
 }
 
-func GetComponents(name string) []interface{} {
-	return ContainerInstance().GetComponents(name)
-}
-
-func GetComponent(name string) interface{} {
-	return ContainerInstance().GetComponent(name)
+func CallInjected(method interface{}) error {
+	return ContainerInstance().CallInjected(method)
 }
 
 func Close() {
