@@ -304,7 +304,7 @@ func (self *SmartConf) getValue(name string, class reflect.Type) (reflect.Value,
 	case reflect.Slice:
 
 		sliceSize := 0
-		for mapHasKeyStartingWith(self.env, fmt.Sprintf("%s[%d]", name, sliceSize)) {
+		for mapHasKeyStartingWith(self.env, fmt.Sprintf("%s.%d", name, sliceSize)) {
 			sliceSize++
 		}
 
@@ -312,7 +312,7 @@ func (self *SmartConf) getValue(name string, class reflect.Type) (reflect.Value,
 
 		elemType := class.Elem()
 		for i := 0; i < sliceSize; i++ {
-			if value, err := self.getValue(fmt.Sprintf("%s[%d]", name, i), elemType); err == nil {
+			if value, err := self.getValue(fmt.Sprintf("%s.%d", name, i), elemType); err == nil {
 				sliceValue = reflect.Append(sliceValue, value)
 			} else {
 				return reflect.Value{}, errors.Wrapf(err, "Error during parse value of slice at index %d", i)

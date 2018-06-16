@@ -44,7 +44,6 @@ The librairies are:
 ## When Pigs?
 
 One day, maybe. But not before the end of this TODO list:
-* [errors](https://github.com/juju/errors) integration
 * [Logrus](https://github.com/sirupsen/logrus) integration
 * [Iris](https://github.com/kataras/iris) integration, with actuators:
     * components: complete list of components in IOC module (?)

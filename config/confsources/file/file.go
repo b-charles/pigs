@@ -38,7 +38,7 @@ func ConvertObjectInEnv(env map[string]string, root string, object interface{}) 
 	case []interface{}:
 
 		for idx, elt := range value {
-			ConvertObjectInEnv(env, fmt.Sprintf("%s[%d]", root, idx), elt)
+			ConvertObjectInEnv(env, fmt.Sprintf("%s.%d", root, idx), elt)
 		}
 
 	case map[string]interface{}:

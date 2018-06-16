@@ -37,9 +37,9 @@ var _ = Describe("FileToml", func() {
 		Expect(env).Should(HaveKeyWithValue("my.property", "MyValue"))
 		Expect(env).Should(HaveKeyWithValue("my.number", "42"))
 		Expect(env).Should(HaveKeyWithValue("my.float", "1.61803398"))
-		Expect(env).Should(HaveKeyWithValue("my.array[0]", "one"))
-		Expect(env).Should(HaveKeyWithValue("my.array[1]", "two"))
-		Expect(env).Should(HaveKeyWithValue("my.array[2]", "3"))
+		Expect(env).Should(HaveKeyWithValue("my.array.0", "one"))
+		Expect(env).Should(HaveKeyWithValue("my.array.1", "two"))
+		Expect(env).Should(HaveKeyWithValue("my.array.2", "3"))
 		Expect(env).Should(HaveKeyWithValue("my.substruct.toto", "tata"))
 
 	})

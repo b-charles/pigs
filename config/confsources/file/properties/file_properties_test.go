@@ -24,7 +24,7 @@ var _ = Describe("FileProperties", func() {
 ! This is an other one
 
 my.property=MyValue
-who.do.that Nobody, I guess
+who.does.that Nobody, I guess
 psycho:Only psychopaths use :
 
 my.replaced.property=${my.property}
@@ -35,7 +35,7 @@ my.replaced.property=${my.property}
 
 		Expect(env).Should(HaveLen(4))
 		Expect(env).Should(HaveKeyWithValue("my.property", "MyValue"))
-		Expect(env).Should(HaveKeyWithValue("who.do.that", "Nobody, I guess"))
+		Expect(env).Should(HaveKeyWithValue("who.does.that", "Nobody, I guess"))
 		Expect(env).Should(HaveKeyWithValue("psycho", "Only psychopaths use :"))
 		Expect(env).Should(HaveKeyWithValue("my.replaced.property", "${my.property}"))
 
