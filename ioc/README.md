@@ -296,16 +296,16 @@ func init() {
 package pkg_test
 
 import (
-	"testing"
+    "testing"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+    . "github.com/onsi/ginkgo"
+    . "github.com/onsi/gomega"
     . "pkg"
 )
 
 func TestIoc(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "App test suite")
+    RegisterFailHandler(Fail)
+    RunSpecs(t, "App test suite")
 }
 
 type SmallStuffDoerMock struct {}
