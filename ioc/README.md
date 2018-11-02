@@ -117,7 +117,7 @@ Let's see each steps in details.
 
 ### Definition
 
-To be able to use a component, you should start by record it, or by define how it will be create. That's the definition step.
+To be able to use a component, you should start by recording it, or by defining how it will be created. That's the definition step.
 
 You can call the functions `ioc.Put` to record directly the component, its main name and optionally its aliases:
 ```go
