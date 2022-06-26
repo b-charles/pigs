@@ -3,7 +3,7 @@ package conf_test
 import (
 	"testing"
 
-	. "github.com/l3eegbee/pigs/config/confsources/conf"
+	. "github.com/b-charles/pigs/config/confsources/conf"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

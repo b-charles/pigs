@@ -1,8 +1,8 @@
 package init
 
 import (
-	. "github.com/l3eegbee/pigs/config/confsources/conf"
-	"github.com/l3eegbee/pigs/ioc"
+	. "github.com/b-charles/pigs/config/confsources/conf"
+	"github.com/b-charles/pigs/ioc"
 )
 
 func init() {

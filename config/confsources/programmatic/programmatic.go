@@ -1,8 +1,8 @@
 package programmatic
 
 import (
-	. "github.com/l3eegbee/pigs/config/confsources"
-	"github.com/l3eegbee/pigs/ioc"
+	. "github.com/b-charles/pigs/config/confsources"
+	"github.com/b-charles/pigs/ioc"
 )
 
 func SetEnvForTestsWithPriority(priority int, env map[string]string) {

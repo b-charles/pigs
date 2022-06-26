@@ -6,7 +6,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "github.com/l3eegbee/pigs/config"
+	. "github.com/b-charles/pigs/config"
 )
 
 func TestConfig(t *testing.T) {

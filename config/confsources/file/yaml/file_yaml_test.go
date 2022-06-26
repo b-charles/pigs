@@ -6,7 +6,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "github.com/l3eegbee/pigs/config/confsources/file/yaml"
+	. "github.com/b-charles/pigs/config/confsources/file/yaml"
 )
 
 func TestConfsources(t *testing.T) {

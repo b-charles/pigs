@@ -3,7 +3,7 @@ package toml
 import (
 	enc "github.com/BurntSushi/toml"
 
-	. "github.com/l3eegbee/pigs/config/confsources/file"
+	. "github.com/b-charles/pigs/config/confsources/file"
 )
 
 func ParseTomlToEnv(content string) map[string]string {

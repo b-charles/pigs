@@ -268,7 +268,7 @@ func (self *SmartConf) getValue(name string, class reflect.Type) (reflect.Value,
 		re := regexp.MustCompile(fmt.Sprintf("^%s\\.([^.]+)", regexp.QuoteMeta(name)))
 
 		keys := make(map[string]bool)
-		for key, _ := range self.env {
+		for key := range self.env {
 			if match := re.FindStringSubmatch(key); match != nil {
 				keys[match[1]] = true
 			}
@@ -277,7 +277,7 @@ func (self *SmartConf) getValue(name string, class reflect.Type) (reflect.Value,
 		mapValue := reflect.MakeMapWithSize(class, len(keys))
 
 		elemType := class.Elem()
-		for key, _ := range keys {
+		for key := range keys {
 			if value, err := self.getValue(fmt.Sprintf("%s.%s", name, key), elemType); err == nil {
 				mapValue.SetMapIndex(reflect.ValueOf(key), value)
 			} else {
@@ -384,7 +384,7 @@ func (self *SmartConf) MustConfigure(root string, obj interface{}) interface{} {
 
 func mapHasKeyStartingWith(env map[string]string, start string) bool {
 
-	for key, _ := range env {
+	for key := range env {
 		if strings.HasPrefix(key, start) {
 			return true
 		}

@@ -6,7 +6,7 @@ import (
 
 	"github.com/juju/loggo"
 	"github.com/juju/loggo/loggocolor"
-	"github.com/l3eegbee/pigs/ioc"
+	"github.com/b-charles/pigs/ioc"
 )
 
 var (

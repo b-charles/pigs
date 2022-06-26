@@ -24,6 +24,8 @@ type InjectedStruct struct {
 	SimpleStruct *SimpleStruct
 }
 
+func (self *InjectedStruct) doSomething() {}
+
 func InjectedStructFactory(injected struct {
 	SimpleStruct *SimpleStruct `inject:"A"`
 }) *InjectedStruct {
@@ -33,6 +35,8 @@ func InjectedStructFactory(injected struct {
 type InjectedObject struct {
 	A *SimpleStruct `inject:""`
 }
+
+func (self *InjectedObject) doSomething() {}
 
 // Class SliceInjectedStruct
 

@@ -3,7 +3,7 @@ package yaml
 import (
 	enc "gopkg.in/yaml.v2"
 
-	. "github.com/l3eegbee/pigs/config/confsources/file"
+	. "github.com/b-charles/pigs/config/confsources/file"
 )
 
 func ParseYamlToEnv(content string) map[string]string {

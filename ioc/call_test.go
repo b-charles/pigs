@@ -1,7 +1,7 @@
 package ioc_test
 
 import (
-	. "github.com/l3eegbee/pigs/ioc"
+	. "github.com/b-charles/pigs/ioc"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -93,6 +93,7 @@ var _ = Describe("IOC call", func() {
 				A *SimpleStruct
 			}) {
 				injectedA = injected.A
+				injectedA.doSomething()
 			})).Should(HaveOccurred())
 
 		})
@@ -108,6 +109,7 @@ var _ = Describe("IOC call", func() {
 				A *SimpleStruct
 			}) {
 				injectedA = injected.A
+				injectedA.doSomething()
 			})).Should(HaveOccurred())
 
 		})

@@ -8,8 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	. "github.com/l3eegbee/pigs/config/confsources"
-	"github.com/l3eegbee/pigs/ioc"
+	"github.com/b-charles/pigs/ioc"
 )
 
 func ConvertObjectInEnv(env map[string]string, root string, object interface{}) {

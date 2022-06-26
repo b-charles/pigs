@@ -8,7 +8,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "github.com/l3eegbee/pigs/smartconf"
+	. "github.com/b-charles/pigs/smartconf"
 )
 
 func TestConfig(t *testing.T) {

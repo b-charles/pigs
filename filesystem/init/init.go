@@ -1,7 +1,7 @@
 package init
 
 import (
-	"github.com/l3eegbee/pigs/ioc"
+	"github.com/b-charles/pigs/ioc"
 	"github.com/spf13/afero"
 )
 

@@ -1,7 +1,7 @@
 package ioc_test
 
 import (
-	. "github.com/l3eegbee/pigs/ioc"
+	. "github.com/b-charles/pigs/ioc"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

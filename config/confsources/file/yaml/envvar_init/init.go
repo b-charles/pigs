@@ -1,9 +1,9 @@
 package envvar_init
 
 import (
-	. "github.com/l3eegbee/pigs/config/confsources"
-	. "github.com/l3eegbee/pigs/config/confsources/file"
-	. "github.com/l3eegbee/pigs/config/confsources/file/yaml"
+	. "github.com/b-charles/pigs/config/confsources"
+	. "github.com/b-charles/pigs/config/confsources/file"
+	. "github.com/b-charles/pigs/config/confsources/file/yaml"
 )
 
 func init() {

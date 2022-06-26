@@ -5,7 +5,7 @@ import (
 	"regexp"
 
 	"github.com/juju/loggo"
-	"github.com/l3eegbee/pigs/ioc"
+	"github.com/b-charles/pigs/ioc"
 )
 
 var (

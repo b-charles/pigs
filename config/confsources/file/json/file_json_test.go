@@ -3,7 +3,7 @@ package json_test
 import (
 	"testing"
 
-	. "github.com/l3eegbee/pigs/config/confsources/file/json"
+	. "github.com/b-charles/pigs/config/confsources/file/json"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

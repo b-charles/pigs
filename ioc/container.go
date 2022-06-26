@@ -1,9 +1,8 @@
 package ioc
 
 import (
+	"fmt"
 	"reflect"
-
-	"github.com/pkg/errors"
 )
 
 // CONTAINER
@@ -151,15 +150,22 @@ func (self *Container) extractInstances(name string, components map[string][]*Co
 func (self *Container) getComponentInstances(name string) ([]*Instance, error) {
 
 	wrap := func(err error) error {
-		return errors.Wrapf(err, "Error during instanciations of '%s'", name)
+		return fmt.Errorf("Error during instanciation of '%s', %w", name, err)
 	}
 
-	if instances, err := self.extractInstances(name, self.testComponents); err != nil || len(instances) > 0 {
+	instances, err := self.extractInstances(name, self.testComponents)
+	if err != nil {
 		return instances, wrap(err)
 	}
+	if len(instances) > 0 {
+		return instances, nil
+	}
 
-	instances, err := self.extractInstances(name, self.coreComponents)
-	return instances, wrap(err)
+	instances, err = self.extractInstances(name, self.coreComponents)
+	if err != nil {
+		return instances, wrap(err)
+	}
+	return instances, nil
 
 }
 
@@ -175,7 +181,7 @@ func (self *Container) resolve(name string, class reflect.Type) (reflect.Value, 
 	if err != nil {
 		return reflect.Value{}, err
 	} else if len(instances) == 0 {
-		return reflect.Value{}, errors.Errorf("No producer found for '%s'.", name)
+		return reflect.Value{}, fmt.Errorf("No producer found for '%s'.", name)
 	}
 
 	if instanceType := instances[0].value.Type(); !instanceType.AssignableTo(class) {
@@ -194,7 +200,7 @@ func (self *Container) resolve(name string, class reflect.Type) (reflect.Value, 
 		} else if class.Kind() == reflect.Map {
 
 			if keyClass := class.Key(); keyClass != string_type {
-				return reflect.Value{}, errors.Errorf("Unsupported key type for a map injection: %v, only 'string' is valid.", keyClass)
+				return reflect.Value{}, fmt.Errorf("Unsupported key type for a map injection: %v, only 'string' is valid.", keyClass)
 			}
 
 			class = class.Elem()
@@ -217,7 +223,7 @@ func (self *Container) resolve(name string, class reflect.Type) (reflect.Value, 
 			producers = append(producers, instance.producer)
 		}
 
-		return reflect.Value{}, errors.Errorf("Too many producers found for '%s': %v.", name, producers)
+		return reflect.Value{}, fmt.Errorf("Too many producers found for '%s': %v.", name, producers)
 
 	}
 
@@ -253,7 +259,7 @@ func (self *Container) inject(value reflect.Value, onlyTagged bool) error {
 		}
 
 		if !field.CanSet() {
-			return errors.Errorf("The field %v of %v is not settable.", fieldType, class)
+			return fmt.Errorf("The field %v of %v is not settable.", fieldType, class)
 		}
 
 		if val, err := self.resolve(name, fieldType.Type); err != nil {
@@ -273,7 +279,7 @@ func recoveredCall(method reflect.Value, args []reflect.Value) (out []reflect.Va
 
 	defer func() {
 		if r, ok := recover().(error); ok {
-			err = errors.Wrapf(r, "Error while calling %v", method)
+			err = fmt.Errorf("Error while calling %v, %w", method, r)
 		}
 	}()
 
@@ -285,7 +291,7 @@ func recoveredCall(method reflect.Value, args []reflect.Value) (out []reflect.Va
 func (self *Container) callInjected(method reflect.Value) ([]reflect.Value, error) {
 
 	if method.Kind() != reflect.Func {
-		return []reflect.Value{}, errors.Errorf("The argument is not a function: %v", method)
+		return []reflect.Value{}, fmt.Errorf("The argument is not a function: %v", method)
 	}
 
 	methodType := method.Type()
@@ -366,14 +372,14 @@ func (self *Container) CallInjected(method interface{}) error {
 
 	if len(out) == 1 {
 		if err, ok := out[0].Interface().(error); !ok {
-			return errors.Errorf("The output of the method should be an error, not a '%v'.", out[0].Type())
+			return fmt.Errorf("The output of the method should be an error, not a '%v'.", out[0].Type())
 		} else if err != nil {
 			return err
 		}
 	}
 
 	if len(out) > 1 {
-		return errors.Errorf("The method should return none or one output, not %d.", len(out))
+		return fmt.Errorf("The method should return none or one output, not %d.", len(out))
 	}
 
 	return nil

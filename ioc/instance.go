@@ -1,10 +1,9 @@
 package ioc
 
 import (
+	"fmt"
 	"io"
 	"reflect"
-
-	"github.com/pkg/errors"
 )
 
 // instance represents a Component instance. It's created by the factory of the
@@ -49,8 +48,10 @@ func (self *Instance) isNil() bool {
 // pointer to a struct, each field is injected.
 func (self *Instance) initialize(container *Container) error {
 
-	err := container.inject(self.value, true)
-	return errors.Wrapf(err, "Error during initialisation of '%v'", self.producer)
+	if err := container.inject(self.value, true); err != nil {
+		return fmt.Errorf("Error during initialisation of '%v': %w", self.producer, err)
+	}
+	return nil
 
 }
 
@@ -58,7 +59,7 @@ func (self *Instance) initialize(container *Container) error {
 func (self *Instance) postInit(container *Container) error {
 
 	wrap := func(err error) error {
-		return errors.Wrapf(err, "Error during post-initialization of '%v'", self.producer)
+		return fmt.Errorf("Error during post-initialization of '%v': %w", self.producer, err)
 	}
 
 	method := self.value.MethodByName("PostInit")
@@ -73,14 +74,14 @@ func (self *Instance) postInit(container *Container) error {
 
 	if len(out) == 1 {
 		if err, ok := out[0].Interface().(error); !ok {
-			return wrap(errors.Errorf("The output of the post-init method should be an error, not a '%v'.", out[0].Type()))
+			return wrap(fmt.Errorf("The output of the post-init method should be an error, not a '%v'.", out[0].Type()))
 		} else if err != nil {
 			return wrap(err)
 		}
 	}
 
 	if len(out) > 1 {
-		return wrap(errors.Errorf("The post-init method should return none or one output, not %d.", len(out)))
+		return wrap(fmt.Errorf("The post-init method should return none or one output, not %d.", len(out)))
 	}
 
 	return nil

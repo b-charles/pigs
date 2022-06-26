@@ -1,9 +1,8 @@
 package ioc
 
 import (
+	"fmt"
 	"reflect"
-
-	"github.com/pkg/errors"
 )
 
 type Component struct {
@@ -15,7 +14,7 @@ type Component struct {
 func NewComponent(factory interface{}, name string, aliases []string) (*Component, error) {
 
 	wrap := func(err error) error {
-		return errors.Wrapf(err, "Error during registration of '%s'", name)
+		return fmt.Errorf("Error during registration of '%s': %w", name, err)
 	}
 
 	// get unique aliases
@@ -24,7 +23,7 @@ func NewComponent(factory interface{}, name string, aliases []string) (*Componen
 	uniqueAliases[name] = true
 	for _, alias := range aliases {
 		if _, ok := uniqueAliases[alias]; ok {
-			return nil, wrap(errors.Errorf("Alias specified more than once: '%s'.", alias))
+			return nil, wrap(fmt.Errorf("Alias specified more than once: '%s'.", alias))
 		}
 		uniqueAliases[alias] = true
 	}
@@ -43,7 +42,7 @@ func NewComponent(factory interface{}, name string, aliases []string) (*Componen
 func (self *Component) instanciate(container *Container) (*Instance, error) {
 
 	wrap := func(err error) (*Instance, error) {
-		return voidInstance(self), errors.Wrapf(err, "Error during instanciation of '%s'", self.name)
+		return voidInstance(self), fmt.Errorf("Error during instanciation of '%s': %w", self.name, err)
 	}
 
 	out, err := container.callInjected(self.factory)
@@ -52,19 +51,19 @@ func (self *Component) instanciate(container *Container) (*Instance, error) {
 	}
 
 	if len(out) == 0 {
-		return wrap(errors.Errorf("The factory should return at least one output."))
+		return wrap(fmt.Errorf("The factory should return at least one output."))
 	}
 
 	if len(out) == 2 {
 		if err, ok := out[1].Interface().(error); !ok {
-			return wrap(errors.Errorf("The second output of the factory should be an error, not a '%v'.", out[1].Type()))
+			return wrap(fmt.Errorf("The second output of the factory should be an error, not a '%v'.", out[1].Type()))
 		} else if err != nil {
 			return wrap(err)
 		}
 	}
 
 	if len(out) > 2 {
-		return wrap(errors.Errorf("The factory should return one or two output, not %d.", len(out)))
+		return wrap(fmt.Errorf("The factory should return one or two output, not %d.", len(out)))
 	}
 
 	obj := out[0]

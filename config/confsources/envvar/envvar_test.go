@@ -3,7 +3,7 @@ package envvar_test
 import (
 	"testing"
 
-	. "github.com/l3eegbee/pigs/config/confsources/envvar"
+	. "github.com/b-charles/pigs/config/confsources/envvar"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

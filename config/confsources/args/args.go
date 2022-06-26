@@ -4,7 +4,7 @@ import (
 	"os"
 	"regexp"
 
-	. "github.com/l3eegbee/pigs/config/confsources"
+	. "github.com/b-charles/pigs/config/confsources"
 )
 
 var valueRegexp *regexp.Regexp = regexp.MustCompile("^--([^=]+)=(.*)$")

@@ -28,7 +28,7 @@ Because of [Pigs is Pigs](https://www.youtube.com/watch?v=GYXlF3sa9xs) very Gois
 
 You should be able to install Pigs with using dep:
 ```
-$ dep ensure --add github.com/l3eegbee/pigs/...
+$ go get github.com/b-charles/pigs
 ```
 or something. I don't know, I've never tried yet.
 

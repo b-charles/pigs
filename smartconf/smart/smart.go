@@ -1,9 +1,10 @@
 package smart
 
 import (
-	"github.com/l3eegbee/pigs/ioc"
-	. "github.com/l3eegbee/pigs/smartconf"
-	"github.com/pkg/errors"
+	"fmt"
+
+	"github.com/b-charles/pigs/ioc"
+	. "github.com/b-charles/pigs/smartconf"
 )
 
 func Inject(conf interface{}, root string, name string, aliases ...string) {
@@ -16,7 +17,7 @@ func Inject(conf interface{}, root string, name string, aliases ...string) {
 			if conf, err := injected.SmartConfiguration.Configure(root, conf); err == nil {
 				return conf
 			} else {
-				panic(errors.Wrapf(err, "Error during smart configuration of %v", conf))
+				panic(fmt.Errorf("Error during smart configuration of %v: %w", conf, err))
 			}
 
 		}, name, aliases...)

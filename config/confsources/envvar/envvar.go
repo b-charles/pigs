@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	. "github.com/l3eegbee/pigs/config/confsources"
+	. "github.com/b-charles/pigs/config/confsources"
 )
 
 func ParseEnvVar(envvar []string) map[string]string {

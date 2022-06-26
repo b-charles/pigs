@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	. "github.com/l3eegbee/pigs/config/confsources"
+	. "github.com/b-charles/pigs/config/confsources"
 )
 
 type DefaultConfigSource struct {

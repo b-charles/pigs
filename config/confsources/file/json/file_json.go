@@ -3,7 +3,7 @@ package json
 import (
 	enc "encoding/json"
 
-	. "github.com/l3eegbee/pigs/config/confsources/file"
+	. "github.com/b-charles/pigs/config/confsources/file"
 )
 
 func ParseJsonToEnv(content string) map[string]string {
