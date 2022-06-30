@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	. "github.com/b-charles/pigs/config/confsources"
 	"github.com/b-charles/pigs/ioc"
 )
 

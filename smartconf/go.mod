@@ -1,10 +1,11 @@
-module github.com/b-charles/pigs/ioc
+module github.com/b-charles/pigs/smartconf
 
 go 1.18
 
 require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.19.0
+	github.com/pkg/errors v0.9.1
 )
 
 require (

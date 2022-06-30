@@ -11,7 +11,7 @@ func init() {
 		func(injected struct {
 			DefaultSources []ConfigSource
 			ConfigSources  []ConfigSource
-		}) *Configuration {
+		}) Configuration {
 			return CreateConfiguration(append(injected.DefaultSources, injected.ConfigSources...))
 		}, "Configuration")
 
