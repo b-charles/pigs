@@ -1,7 +1,6 @@
-package init
+package envvar
 
 import (
-	. "github.com/b-charles/pigs/config/confsources/envvar"
 	"github.com/b-charles/pigs/ioc"
 )
 

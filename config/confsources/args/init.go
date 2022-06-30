@@ -1,7 +1,6 @@
-package init
+package args
 
 import (
-	. "github.com/b-charles/pigs/config/confsources/args"
 	"github.com/b-charles/pigs/ioc"
 )
 

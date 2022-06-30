@@ -7,13 +7,17 @@ import (
 	. "github.com/b-charles/pigs/config/confsources"
 )
 
+func convertEnvVarKey(key string) string {
+	return strings.Replace(strings.ToLower(key), "_", ".", -1)
+}
+
 func ParseEnvVar(envvar []string) map[string]string {
 
 	env := make(map[string]string)
 
 	for _, e := range envvar {
 		pair := strings.Split(e, "=")
-		env[ConvertEnvVarKey(pair[0])] = pair[1]
+		env[convertEnvVarKey(pair[0])] = pair[1]
 	}
 
 	return env

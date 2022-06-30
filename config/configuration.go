@@ -1,7 +1,6 @@
 package config
 
 import (
-	"bytes"
 	"regexp"
 	"sort"
 	"strings"
@@ -93,22 +92,22 @@ func (self *CyclicLoopError) push(key, value string) *CyclicLoopError {
 
 func (self *CyclicLoopError) Error() string {
 
-	var buffer bytes.Buffer
+	var b strings.Builder
 
-	buffer.WriteString("Cyclic loop detected: ")
+	b.WriteString("Cyclic loop detected: ")
 
-	buffer.WriteString(self.loop[0].key)
-	buffer.WriteString(":'")
-	buffer.WriteString(self.loop[0].value)
+	b.WriteString(self.loop[0].key)
+	b.WriteString(":'")
+	b.WriteString(self.loop[0].value)
 	for i := 1; i < len(self.loop); i++ {
-		buffer.WriteString("' -> ")
-		buffer.WriteString(self.loop[i].key)
-		buffer.WriteString(":'")
-		buffer.WriteString(self.loop[i].value)
+		b.WriteString("' -> ")
+		b.WriteString(self.loop[i].key)
+		b.WriteString(":'")
+		b.WriteString(self.loop[i].value)
 	}
-	buffer.WriteString("'")
+	b.WriteString("'")
 
-	return buffer.String()
+	return b.String()
 
 }
 

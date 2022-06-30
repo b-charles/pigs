@@ -3,11 +3,9 @@ module github.com/b-charles/pigs/config
 go 1.18
 
 require (
-	github.com/BurntSushi/toml v1.1.0
-	github.com/magiconair/properties v1.8.6
+	github.com/b-charles/pigs/ioc v0.0.0-00010101000000-000000000000
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.19.0
-	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
@@ -17,4 +15,15 @@ require (
 	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e // indirect
 	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
+
+replace github.com/b-charles/pigs/ioc => ../ioc
+
+replace github.com/b-charles/pigs/config/confsources => ./confsources
+
+replace github.com/b-charles/pigs/config/confsources/args => ./confsources/args
+
+replace github.com/b-charles/pigs/config/confsources/envvar => ./confsources/envvar
+
+replace github.com/b-charles/pigs/config/confsources/programmatic => ./confsources/programmatic
