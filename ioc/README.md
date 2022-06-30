@@ -50,7 +50,7 @@ type MyInjectedStruct struct {
 
 var injected *MyInjectedStruct = &MyInjectedStruct{}
 ```
-the first field `NotInjected` is not injected, the second field `FirstInject` is injected with a component named `Something`, and the third field is injected with a component named `SecondInject`. Please note that each injected field should be settable (so exported, with a name beginning with an upper case).
+the first field `NotInjected` is not injected, the second field `FirstInject` is injected with a component named (or aliased) `Something`, and the third field is injected with a component named (or aliased) `SecondInject`. Please note that each injected field should be settable (so exported, with a name beginning with an upper case).
 
 For the mode "all injected", every field should be injected, and the tag `inject` can be used only to define the correct name of the component to inject.
 
@@ -62,7 +62,7 @@ The first form is when the function is defined with none, one or several argumen
 ```go
 func InjectedFunc(first mypkg.SomeInterface, second *RandomComponent) { ... }
 ```
-If the container calls the function, the first argument will be injected with a component named `SomeInterface` and the second argument with a component named `RandomComponent`. Note that package prefix and pointer star `*` are ignored. Of course, the function can be defined without any argument.
+If the container calls the function, the first argument will be injected with a component named `SomeInterface` and the second argument with a component named `RandomComponent`: on the contrary of structure injection, note that it's the type which is used to get the name of the component, and that package prefixes and pointer stars `*` are ignored. Of course, the function can be defined without any argument.
 
 This first form is pretty clear but not very flexible. The other is little more messy, but more useful: the function is defined with only one argument, a structure or a pointer to a structure, which will be injected as defined in the section [Injection of structures](#injection-of-structures), with the flavor "all injected". The type of this sole argument can be properly defined or defined directly in the function:
 ```go
@@ -75,7 +75,7 @@ Here, the argument `injected` will be injected with a component named `SomeCompo
 
 #### Auto-discovery injection
 
-Whether it is an injection in a structure or in a function, if no component or too many components are defined, the container returns an error. But you can inject all components sharing an alias: that's the foundation of the auto-discovery. If the injected value is of type slice, the container will start by trying to resolve the injection normally (a component can be defined as a slice). If no component match the definition, the container will create a slice, add in it all the components with an alias matching the name and inject that slice:
+Whether it is an injection in a structure or in a function, if no component or too many components are defined, the container returns an error. But you can inject all components sharing an alias: that's the foundation of the auto-discovery. If the injected value is of type slice, the container will start by trying to resolve the injection normally (a component can be defined as a slice). If no component match the definition (i.e. if the found components are not assignable to the injected value), the container will create a slice, add in it all the components with an alias matching the name and inject that slice:
 ```go
 type MyInjectedStruct struct {
     AllComponents []SomeInterface `inject:"MagicService"`
@@ -165,7 +165,7 @@ func init() {
 }
 ```
 
-Factories can not define cyclic dependencies (i.e. a factory produces a component `A` which is needed to another factory to create a component `B` which should be injected in the factory of `A`). To resolve the problem, you have break the cycle, and wait another step in the component's lifecycle (like [Injection](#injection) or [Post-Initialization](#post-initialization)) to inject the required component.
+Factories can not define cyclic dependencies (i.e. a factory produces a component `A` which is needed to another factory to create a component `B` which should be injected in the factory of `A`). To resolve the problem, you have to break the cycle, or wait another step in the component's lifecycle (like [Injection](#injection) or [Post-Initialization](#post-initialization)) to inject the required component.
 
 Like explain in the section [Testing](#testing), the functions `Put` and `PutFactory` define the component in the core set. The functions `TestPut` and `TestPutFactory` can be used in the same way to define a component in the test set.
 
@@ -183,7 +183,7 @@ If a factory return a not-null error, the container stops all the process as soo
 
 Regardless of the registration mode (instance or factory), if the component is a structure or a pointer to a structure, it is injected. The process is defined in the section [Injection of structures](#injection-of-structures), with the mode "tagged-only".
 
-At this point, cyclic dependencies can be resolved, but that means that maybe the injected component is not fully initialized (only in case of a cycle: if there is no cycle dependency, the injected component should be ready to be used).
+At this point, cyclic dependencies can be resolved.
 
 #### Post-Initialization
 
@@ -253,7 +253,7 @@ func main() {
 ```
 If a component returns a non-null error at the call of its method `Close`, the error is silently discarded. The `Close` methods are called in the same order than the components are instantiated (component without dependencies first, main components last).
 
-Another way to close every components, and in the same time delete all component registration in the test set, is the function `ClearTests`. The function is essentially useful for unit test. Here an extract of unit tests with `Gomega`:
+Another way to close every components, and in the same time delete all component registration in the test set, is the function `ClearTests`. The function is essentially useful for unit test. Here an extract of unit tests with `Ginkgo`:
 
 [pkg/main.go]
 ```go

@@ -149,13 +149,9 @@ func (self *Container) extractInstances(name string, components map[string][]*Co
 // core map if nothing is found.
 func (self *Container) getComponentInstances(name string) ([]*Instance, error) {
 
-	wrap := func(err error) error {
-		return fmt.Errorf("Error during instanciation of '%s', %w", name, err)
-	}
-
 	instances, err := self.extractInstances(name, self.testComponents)
 	if err != nil {
-		return instances, wrap(err)
+		return instances, err
 	}
 	if len(instances) > 0 {
 		return instances, nil
@@ -163,7 +159,7 @@ func (self *Container) getComponentInstances(name string) ([]*Instance, error) {
 
 	instances, err = self.extractInstances(name, self.coreComponents)
 	if err != nil {
-		return instances, wrap(err)
+		return instances, err
 	}
 	return instances, nil
 
