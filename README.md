@@ -26,32 +26,32 @@ Because of [Pigs is Pigs](https://www.youtube.com/watch?v=GYXlF3sa9xs) very Gois
 
 ## Where's Pigs?
 
-You should be able to install Pigs with using dep:
+You should be able to use Pigs with the `go get` command:
 ```
-$ go get github.com/b-charles/pigs
+$ go get github.com/b-charles/pigs/<module>
 ```
-or something. I don't know, I've never tried yet.
+with `<module>` the module you want to use.
 
 ## How's Pigs?
 
-Pigs is collection of small libraires, for the most only wrapping an existing well done librairy and expose it in an IOC framework.
+Pigs is collection of small libraires exposed it in an IOC framework.
 
 The librairies are:
 * ioc: The IOC framework. Completly written from scratch for the Pigs needs.
-* filesystem: Wrapping of [afero](https://github.com/spf13/afero)
 * config: Configuration collector.
+* smartconf: Smart configuration caster.
+* log: logging for the win.
 
 ## When Pigs?
 
-One day, maybe. But not before the end of this TODO list:
+TODO list:
 * [Logrus](https://github.com/sirupsen/logrus) integration
 * [Iris](https://github.com/kataras/iris) integration, with actuators:
     * components: complete list of components in IOC module (?)
     * env: complete configuration map
     * health
-    * loggers: show and modifies the condfiguation of logger (?)
     * shutdown
 * Unix signal support
+* ApplicationContainer's life-cycle awareness
 * [Cobra](https://github.com/spf13/cobra) integration (Maybe)
-* [Viper](https://github.com/spf13/viper) integration (As repacement of configuration? Second level of configuration with dynamic features?)
 
