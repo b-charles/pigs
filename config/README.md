@@ -53,6 +53,8 @@ func init() {
 }
 ```
 
+The module can also be used to define some values for unit tests. When using the function `SetEnvForTests`, a special component is created using the given map as a configuration source and defined in the test scope. The method should be called in the fixture (before tests) of unit tests, and the method `ioc.ClearTests` should be called to clear the definitions.
+
 #### Environment variables
 
 This configuration source handles environment variables. It's defined with the priority `0`.
@@ -71,12 +73,6 @@ Arguments can be in one of theses format (with `[name]` the name of the variable
 * `--[name]="[value]"` (e.g.: `--music="Via con me"`)
 * `--[name]` for boolean value, which will be associated with the value `true`
 * `--no-[name]` for boolean value, which will be associated with the value `false`.
-
-#### Programmatic configuration source
-
-This last supported configuration source is used for the unit tests. It's defined (by default) with the priority `999`, in the module `github.com/b-charles/pigs/config/confsources/programmatic`.
-
-The method `SetEnvForTests` takes a map of string to string in input and call the ioc module to record a new config source in the test scope. The method should be called in the fixture (before tests) of unit tests, and the method `ioc.ClearTests` should be called to clear the definitions.
 
 ### The `Configuration`
 
