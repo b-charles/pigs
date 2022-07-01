@@ -11,7 +11,7 @@ func SetEnvForTestsWithPriority(priority int, env map[string]string) {
 			Priority: priority,
 			Env:      env,
 		},
-		"ProgrammaticConfigSource", "ConfigSources")
+		"ProgrammaticConfigSource", "ConfigSource")
 }
 
 func SetEnvForTests(env map[string]string) {

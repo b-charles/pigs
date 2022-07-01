@@ -5,5 +5,5 @@ import (
 )
 
 func init() {
-	ioc.Put(NewArgsConfigSource(), "ArgsConfigSource", "ConfigSources")
+	ioc.Put(NewArgsConfigSource(), "ArgsConfigSource", "ConfigSource")
 }

@@ -5,5 +5,5 @@ import (
 )
 
 func init() {
-	ioc.Put(NewEnvVarConfigSource(), "EnvVarConfigSource", "EnvVar", "ConfigSources")
+	ioc.Put(NewEnvVarConfigSource(), "EnvVarConfigSource", "ConfigSource")
 }
