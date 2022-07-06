@@ -35,7 +35,7 @@ func (self *Instance) isNil() bool {
 		kind != reflect.Func &&
 		kind != reflect.Interface &&
 		kind != reflect.Map &&
-		kind != reflect.Ptr &&
+		kind != reflect.Pointer &&
 		kind != reflect.Slice {
 		return false
 	}
@@ -88,11 +88,26 @@ func (self *Instance) postInit(container *Container) error {
 
 }
 
+func (self *Instance) isClosable() bool {
+	_, closable := self.value.Interface().(io.Closer)
+	return closable
+}
+
 // close call the Close method (if defined).
 func (self *Instance) close(container *Container) {
 
 	if closer, ok := self.value.Interface().(io.Closer); ok {
+
+		defer func() {
+			_ = recover()
+		}()
+
 		_ = closer.Close()
+
 	}
 
+}
+
+func (self *Instance) String() string {
+	return self.producer.name
 }

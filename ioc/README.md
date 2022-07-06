@@ -28,9 +28,9 @@ And some goals are deliberated ignored:
 
 A component is something: a struct, a pointer, a map, a chan, an integer... It's a variable that should be unique (singleton) and which will be injected in all other components that need it. Each component is defined with a main name and optionally some aliases. The main name can be any string but `nil` or `""` (empty), and have to be unique in all the application. Aliases can be any string (with the same exceptions) and are not required to be unique (several components can share a same alias).
 
-A container is a set of components: it manages the lifecycle of every component and take in charge the injection process. To know what component should be injected, the container look after names: each injection defines the name (main name or alias) of the component that should be injected. If there is a problem of type (the component injected doesn't correspond to the expected type), the container detects it and returns an error. It's the responsibility of the developer to choose wisely the names of the components to avoid collisions, and to define components and injections that are compatible.
+A container is a set of components: it manages the lifecycle of each component and take in charge the injection process. To know what component should be injected, the container look after names: each injection defines the name (main name or alias) of the component that should be injected. If there is a problem of type (the component injected doesn't correspond to the expected type), the container detects it and returns an error. It's the responsibility of the developer to choose wisely the names of the components to avoid collisions, and to define components and injections that are compatible.
 
-The container is a managed component itself and can be accessed by the name `ApplicationContainer`.
+The container is a managed component itself and can be accessed by the name `ioc.Container`.
 
 ### Injections
 
@@ -40,8 +40,10 @@ The framework is based on two types of injection: injection of structures and in
 
 At different points in the framework, it appears the need to inject a structure, or a pointer to a structure. Two flavors are possible: "tagged only" and "all injected".
 
-For the mode "tagged only", only the tagged `inject` fields are injected. The value of the tag defines the name (or the alias) of the component to inject. If the value of the tag is empty, the name of the field is used in place of. So if this variable `injected` is injected:
+For the mode "tagged only", only the tagged `inject` fields are injected. The value of the tag defines the name (or the alias) of the component to inject. If the value of the tag is empty, a default name is searched based on [the method `String` of `reflect.Type`](https://pkg.go.dev/reflect#Type) (the type is deferenced if needed). If no component is defined by this name, the name of the field is used in place of. So if this variable `injected` is injected:
 ```go
+package mypkg
+
 type MyInjectedStruct struct {
     NotInjected *NotInjected
     FirstInject SomeInterface `inject:"Something"`
@@ -50,7 +52,7 @@ type MyInjectedStruct struct {
 
 var injected *MyInjectedStruct = &MyInjectedStruct{}
 ```
-the first field `NotInjected` is not injected, the second field `FirstInject` is injected with a component named (or aliased) `Something`, and the third field is injected with a component named (or aliased) `SecondInject`. Please note that each injected field should be settable (so exported, with a name beginning with an upper case).
+the first field `NotInjected` is not injected, the second field `FirstInject` is injected with a component named (or aliased) `Something`, and the third field is injected with a component named (or aliased) `mypkg.AnotherInterface` or, if no component is found, with a component named or aliased `SecondInject`. Please note that each injected field should be settable (so exported, with a name beginning with an upper case).
 
 For the mode "all injected", every field should be injected, and the tag `inject` can be used only to define the correct name of the component to inject.
 
@@ -60,18 +62,18 @@ At other points of the framework, the container use some user-defined functions,
 
 The first form is when the function is defined with none, one or several arguments, each expected to be injected. In that case, the name of the type of each argument is used as the name (or alias) of the component to inject:
 ```go
-func InjectedFunc(first mypkg.SomeInterface, second *RandomComponent) { ... }
+func InjectedFunc(first mypkg.SomeInterface, second *anotherlib.RandomComponent) { ... }
 ```
-If the container calls the function, the first argument will be injected with a component named `SomeInterface` and the second argument with a component named `RandomComponent`: on the contrary of structure injection, note that it's the type which is used to get the name of the component, and that package prefixes and pointer stars `*` are ignored. Of course, the function can be defined without any argument.
+If the container calls the function, the first argument will be injected with a component named `mypkg.SomeInterface` and the second argument with a component named `anotherlib.RandomComponent`: on the contrary of structure injection, note that there is no fallback on the name of the argument. Of course, the function can be defined without any argument.
 
 This first form is pretty clear but not very flexible. The other is little more messy, but more useful: the function is defined with only one argument, a structure or a pointer to a structure, which will be injected as defined in the section [Injection of structures](#injection-of-structures), with the flavor "all injected". The type of this sole argument can be properly defined or defined directly in the function:
 ```go
 func injectedFunc(injected struct {
-    SomeComponent SomeInterface
+    SomeComponent mypkg.SomeInterface
     Another RandomInterface `inject:"RandomComponent"`
 }) { ... }
 ```
-Here, the argument `injected` will be injected with a component named `SomeComponent` and another one named `RandomComponent`.
+Here, the argument `injected` will be injected with a component named `mypkg.SomeComponent` and another one named `RandomComponent`.
 
 #### Auto-discovery injection
 
@@ -119,20 +121,33 @@ Let's see each steps in details.
 
 To be able to use a component, you should start by recording it, or by defining how it will be created. That's the definition step.
 
-You can call the functions `ioc.Put` to record directly the component, its main name and optionally its aliases:
+You can call the functions `ioc.PutNamed` to record directly the component, its main name and optionally its aliases:
 ```go
 type DemoComponent struct { ... }
 
 func init() {
-    if err := ioc.Put(&DemoComponent{}, "MyDemoComponent", "DemoComponentAlias"); err != nil {
+    if err := ioc.PutNamed(&DemoComponent{}, "MyDemoComponent", "DemoComponentAlias"); err != nil {
         panic(err)
     }
 }
 ```
 Recording a component doesn't inject it (not yet). It is only recorded as a not yet initialized component. As you can see, the function `Put` returns an error if something bad had happened (e.g. a component with the same main name is already registered).
 
-Instead of `ioc.Put`, you can also use `ioc.PutFactory` to define a factory, a function which will create the component:
+You can also use the function `ioc.Put` to record the component and let the framework to choose the main name, again built with the the method `String` of `reflect.Type` like the injection default name.
 ```go
+type DemoComponent struct { ... }
+
+func init() {
+    if err := ioc.Put(&DemoComponent{}); err != nil {
+        panic(err)
+    }
+}
+```
+
+Instead of `ioc.Put` and `ioc.PutNamed`, you can also use `ioc.PutFactory` and `ioc.PutNamedFactory` to define a factory, a function which will create the component:
+```go
+package mypkg
+
 type DemoComponent struct {}
 
 func ComponentFactory() *DemoComponent {
@@ -140,12 +155,16 @@ func ComponentFactory() *DemoComponent {
 }
 
 func init() {
-    if err := ioc.PutFactory(ComponentFactory, "MyDemoComponent", "DemoComponentAlias"); err != nil {
+    if err := ioc.PutNamedFactory(ComponentFactory, "MyDemoComponent", "DemoComponentAlias"); err != nil {
+        panic(err)
+    }
+    // or
+    if err := ioc.PutFactory(ComponentFactory); err != nil {
         panic(err)
     }
 }
 ```
-Recording a factory doesn't call it, but it will be used to instantiate the component in a next step. At that time, the arguments of the factory will be injected like it is described in the section [Injection of functions](#injection-of-functions). The factory should at least return the created component, and can also return an error:
+The function `PutFactory` use the type of the first output to compute a main name (here, it should be `mypkg.DemoComponent`). Recording a factory doesn't call it, but it will be used to instantiate the component in a next step. At that time, the arguments of the factory will be injected like it is described in the section [Injection of functions](#injection-of-functions). The factory should at least return the created component, and can also return an error:
 ```go
 type DemoComponent struct {}
 
@@ -159,7 +178,7 @@ func ComponentFactory() (*DemoComponent, error) {
 }
 
 func init() {
-    if err := ioc.PutFactory(ComponentFactory, "MyDemoComponent", "DemoComponentAlias"); err != nil {
+    if err := ioc.PutFactory(ComponentFactory); err != nil {
         panic(err)
     }
 }
@@ -167,7 +186,7 @@ func init() {
 
 Factories can not define cyclic dependencies (i.e. a factory produces a component `A` which is needed to another factory to create a component `B` which should be injected in the factory of `A`). To resolve the problem, you have to break the cycle, or wait another step in the component's lifecycle (like [Injection](#injection) or [Post-Initialization](#post-initialization)) to inject the required component.
 
-Like explain in the section [Testing](#testing), the functions `Put` and `PutFactory` define the component in the core set. The functions `TestPut` and `TestPutFactory` can be used in the same way to define a component in the test set.
+Like explain in the section [Testing](#testing), the functions `Put`, `PutNamed`, `PutFactory` and `PutNamedFactory` define the component in the core set. The functions `TestPut`, `TestPutNamed`, `TestPutFactory` and `TestPutNamedFactory` can be used in the same way to define a component in the test set.
 
 ### Initialization
 
@@ -175,7 +194,7 @@ At some point in the application, probably triggered by the exploitation step, t
 
 #### Instantiation
 
-Of course, the first step is to create an instance. If the component has been defined with the functions `Put` or `TestPut`, the instance is directly used. If the component has been defined with a factory, with the function `PutFactory` or `TestPutFactory`, the factory is called with its argument injected.
+Of course, the first step is to create an instance. If the component has been defined with the functions `Put`, `PutNamed`, `TestPut` or `TestPutNamed`, the instance is directly used. If the component has been defined with a factory, with the function `PutFactory`, `PutNamedFactory`, `TestPutFactory or `TestPutNamedFactory`, the factory is called with its argument injected.
 
 If a factory return a not-null error, the container stops all the process as soon as possible and return the error wrapped in some context messages.
 
@@ -193,13 +212,15 @@ If the component have a method `PostInit`, the container calls it. The method is
 
 Only defining components doesn't create anything. You have to specify what are the main components, the components you need to instantiate and get to starting your application (or doing some tests). The container will instantiate these components, and also their dependencies. The API defines the function `CallInjected` that can be used to retrieve that main components from the container.
 ```go
+package mypkg
+
 type MyMainComponent struct { ... }
 
 func (self *MyMainComponent) start() { ... }
 
 func init() {
 
-    if err := ioc.Put(&MyMainComponent{}, "MyMainComponent"); err != nil {
+    if err := ioc.Put(&MyMainComponent{}); err != nil {
         panic(err)
     }
 
@@ -223,6 +244,8 @@ As you should have guessed, the function `CallInjected` take as sole argument a 
 
 The container can close automatically every component implementing the interface `io.Closer`. To cleanly close the container, you have to call the function `Close`:
 ```go
+package mypkg
+
 type MyMainComponent struct { ... }
 
 func (self *MyMainComponent) start() { ... }
@@ -231,7 +254,7 @@ func (self *MyMainComponent) close() error { ... }
 
 func init() {
 
-    if err := ioc.Put(&MyMainComponent{}, "MyMainComponent"); err != nil {
+    if err := ioc.Put(&MyMainComponent{}); err != nil {
         panic(err)
     }
 
@@ -251,7 +274,7 @@ func main() {
 
 }
 ```
-If a component returns a non-null error at the call of its method `Close`, the error is silently discarded. The `Close` methods are called in the same order than the components are instantiated (component without dependencies first, main components last).
+If a component panics or returns a non-null error at the call of its method `Close`, the error is silently discarded. The `Close` methods are called in the same order than the components are instantiated (component without dependencies first, main components last).
 
 Another way to close every components, and in the same time delete all component registration in the test set, is the function `ClearTests`. The function is essentially useful for unit test. Here an extract of unit tests with `Ginkgo`:
 
@@ -270,7 +293,7 @@ type ComponentA struct {}
 func (self *ComponentA) doSmallStuff() error { ... }
 
 func init() {
-    if err := ioc.Put(&ComponentA{}, "ComponentA", "SmallStuffDoer"); err != nil {
+    if err := ioc.Put(&ComponentA{}, "pkg.SmallStuffDoer"); err != nil {
         panic(err)
     }
 }
@@ -284,7 +307,7 @@ type ComponentB struct {
 func (self *ComponentB) doBigStuff() error { ... }
 
 func init() {
-    if err := ioc.Put(&ComponentB{}, "ComponentB"); err != nil {
+    if err := ioc.Put(&ComponentB{}); err != nil {
         panic(err)
     }
 }
@@ -321,7 +344,7 @@ var _ = Describe("App tests", func() {
     Describe("Component B should work", func() {
 
         BeforeEach(func() {
-            ioc.TestPut(&SmallStuffDoerMock{}, "Mock", "SmallStuffDoer")
+            ioc.TestPut(&SmallStuffDoerMock{}, "pkg.SmallStuffDoer")
         }
 
         It("should work with the mock", func() {

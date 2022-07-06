@@ -11,7 +11,7 @@ type Container struct {
 	coreComponents map[string][]*Component
 	testComponents map[string][]*Component
 	instances      map[*Component]*Instance
-	sorted         []*Instance
+	closables      []*Instance
 }
 
 // NewContainer creates a pointer to new Container. This new container contains
@@ -24,7 +24,7 @@ func NewContainer() *Container {
 		make(map[*Component]*Instance),
 		make([]*Instance, 0)}
 
-	container.Put(container, "ApplicationContainer")
+	container.Put(container)
 
 	return container
 
@@ -60,31 +60,88 @@ func (self *Container) putIn(
 
 }
 
-// wrap convert an object into a function which returns this object.
-func (self *Container) wrap(object interface{}) func() interface{} {
-	return func() interface{} {
+// wrap converts an object into a function which returns this object.
+func wrap[T any](object T) func() T {
+	return func() T {
 		return object
 	}
 }
 
+// defaultName returns the default name of a component type.
+func defaultComponentName(typ reflect.Type) string {
+
+	if typ.Kind() == reflect.Pointer {
+		typ = typ.Elem()
+	}
+
+	return typ.String()
+
+}
+
+// defaultName returns the default name of a component type.
+func defaultFactoryName(t reflect.Type) (string, error) {
+
+	if t.Kind() != reflect.Func {
+		return "", fmt.Errorf("The type %v should be a function.", t)
+	}
+
+	o := t.NumOut()
+	if o == 0 {
+		return "", fmt.Errorf("The function should return at least one value.")
+	}
+
+	return defaultComponentName(t.Out(0)), nil
+
+}
+
+// PutNamedFactory records a new Component by its factory and its name.
+func (self *Container) PutNamedFactory(factory interface{}, name string, aliases ...string) error {
+	return self.putIn(factory, name, aliases, self.coreComponents)
+}
+
+// PutNamed records a new Component by its value and its name.
+func (self *Container) PutNamed(object interface{}, name string, aliases ...string) error {
+	return self.PutNamedFactory(wrap(object), name, aliases...)
+}
+
 // PutFactory records a new Component by its factory.
-func (self *Container) PutFactory(factory interface{}, name string, aliases ...string) error {
+func (self *Container) PutFactory(factory interface{}, aliases ...string) error {
+	name, err := defaultFactoryName(reflect.TypeOf(factory))
+	if err != nil {
+		return fmt.Errorf("Can not register factory '%v': %w", factory, err)
+	}
 	return self.putIn(factory, name, aliases, self.coreComponents)
 }
 
 // Put records a new Component by its value.
-func (self *Container) Put(object interface{}, name string, aliases ...string) error {
-	return self.PutFactory(self.wrap(object), name, aliases...)
+func (self *Container) Put(object interface{}, aliases ...string) error {
+	name := defaultComponentName(reflect.TypeOf(object))
+	return self.PutNamedFactory(wrap(object), name, aliases...)
 }
 
-// PutFactory records a new Component for tests by its factory.
-func (self *Container) TestPutFactory(factory interface{}, name string, aliases ...string) error {
+// TestPutNamedFactory records a new Component for tests by its factory and its name.
+func (self *Container) TestPutNamedFactory(factory interface{}, name string, aliases ...string) error {
 	return self.putIn(factory, name, aliases, self.testComponents)
 }
 
-// Put records a new Component for tests by its value.
-func (self *Container) TestPut(object interface{}, name string, aliases ...string) error {
-	return self.TestPutFactory(self.wrap(object), name, aliases...)
+// TestNamedPut records a new Component for tests by its value and its name.
+func (self *Container) TestPutNamed(object interface{}, name string, aliases ...string) error {
+	return self.TestPutNamedFactory(wrap(object), name, aliases...)
+}
+
+// TestPutFactory records a new Component for tests by its factory.
+func (self *Container) TestPutFactory(factory interface{}, aliases ...string) error {
+	name, err := defaultFactoryName(reflect.TypeOf(factory))
+	if err != nil {
+		return fmt.Errorf("Can not register factory '%v': %w", factory, err)
+	}
+	return self.putIn(factory, name, aliases, self.testComponents)
+}
+
+// TestPut records a new Component for tests by its value.
+func (self *Container) TestPut(object interface{}, aliases ...string) error {
+	name := defaultComponentName(reflect.TypeOf(object))
+	return self.TestPutNamedFactory(wrap(object), name, aliases...)
 }
 
 // INTERNAL RESOLUTION
@@ -112,7 +169,9 @@ func (self *Container) getComponentInstance(component *Component) (*Instance, er
 		return instance, err
 	}
 
-	self.sorted = append(self.sorted, instance)
+	if instance.isClosable() {
+		self.closables = append(self.closables, instance)
+	}
 
 	return instance, nil
 
@@ -169,46 +228,76 @@ func (self *Container) getComponentInstances(name string) ([]*Instance, error) {
 
 var string_type reflect.Type = reflect.TypeOf("")
 
-// resolve get Components with the given name and construct a value of the
-// given type.
-func (self *Container) resolve(name string, class reflect.Type) (reflect.Value, error) {
+// packInstance converts one instance to target type (direct, ptr or addr).
+func packInstance(instance *Instance, target reflect.Type) (reflect.Value, error) {
 
-	instances, err := self.getComponentInstances(name)
-	if err != nil {
-		return reflect.Value{}, err
-	} else if len(instances) == 0 {
-		return reflect.Value{}, fmt.Errorf("No producer found for '%s'.", name)
+	value := instance.value
+	typ := value.Type()
+
+	if typ.AssignableTo(target) {
+		return value, nil
 	}
 
-	if instanceType := instances[0].value.Type(); !instanceType.AssignableTo(class) {
+	if typ.Kind() == reflect.Pointer && typ.Elem().AssignableTo(target) {
+		return value.Elem(), nil
+	}
 
-		if class.Kind() == reflect.Slice {
+	if value.CanAddr() && reflect.PointerTo(typ).AssignableTo(target) {
+		return value.Addr(), nil
+	}
 
-			class = class.Elem()
+	return reflect.Value{}, fmt.Errorf("The component '%v' (%v) can not be assigned to %v.", instance, typ, target)
 
-			slice := reflect.MakeSlice(reflect.SliceOf(class), 0, len(instances))
-			for _, instance := range instances {
-				slice = reflect.Append(slice, instance.value)
+}
+
+// pack converts instance slice (not empty) to target type (direct, ptr, addr, slice or map).
+func packInstances(instances []*Instance, target reflect.Type) (reflect.Value, error) {
+
+	if len(instances) == 0 {
+		return reflect.Value{}, fmt.Errorf("No component found.")
+	}
+
+	if len(instances) == 1 && instances[0].value.Type().AssignableTo(target) {
+		return instances[0].value, nil
+	}
+
+	if target.Kind() == reflect.Slice {
+
+		target = target.Elem()
+
+		slice := reflect.MakeSlice(reflect.SliceOf(target), 0, len(instances))
+		for _, instance := range instances {
+
+			value, err := packInstance(instance, target)
+			if err != nil {
+				return reflect.Value{}, err
 			}
 
-			return slice, nil
-
-		} else if class.Kind() == reflect.Map {
-
-			if keyClass := class.Key(); keyClass != string_type {
-				return reflect.Value{}, fmt.Errorf("Unsupported key type for a map injection: %v, only 'string' is valid.", keyClass)
-			}
-
-			class = class.Elem()
-
-			m := reflect.MakeMapWithSize(reflect.MapOf(string_type, class), len(instances))
-			for _, instance := range instances {
-				m.SetMapIndex(reflect.ValueOf(instance.producer.name), instance.value)
-			}
-
-			return m, nil
+			slice = reflect.Append(slice, value)
 
 		}
+
+		return slice, nil
+
+	}
+
+	if target.Kind() == reflect.Map && target.Key() == string_type {
+
+		target = target.Elem()
+
+		m := reflect.MakeMapWithSize(reflect.MapOf(string_type, target), len(instances))
+		for _, instance := range instances {
+
+			value, err := packInstance(instance, target)
+			if err != nil {
+				return reflect.Value{}, err
+			}
+
+			m.SetMapIndex(reflect.ValueOf(instance.producer.name), value)
+
+		}
+
+		return m, nil
 
 	}
 
@@ -219,47 +308,80 @@ func (self *Container) resolve(name string, class reflect.Type) (reflect.Value, 
 			producers = append(producers, instance.producer)
 		}
 
-		return reflect.Value{}, fmt.Errorf("Too many producers found for '%s': %v.", name, producers)
+		return reflect.Value{}, fmt.Errorf("Too many components found: %v.", producers)
 
 	}
 
-	return instances[0].value, nil
+	return packInstance(instances[0], target)
 
 }
 
-// inject each field of a value, only if the value is a struct or a pointer to
-// a struct.
+// inject each field of a value, only if the value is a struct or a pointer to a struct.
 func (self *Container) inject(value reflect.Value, onlyTagged bool) error {
 
-	if value.Kind() == reflect.Ptr {
+	if value.Kind() == reflect.Pointer {
 		value = value.Elem()
 	}
 	if value.Kind() != reflect.Struct {
 		return nil
 	}
 
-	class := value.Type()
+	typ := value.Type()
 
 	for i := 0; i < value.NumField(); i++ {
 
 		field := value.Field(i)
-		fieldType := class.Field(i)
+		structField := typ.Field(i)
 
-		name, ok := fieldType.Tag.Lookup("inject")
+		nameField := structField.Name
+		typeField := structField.Type
+
+		name, ok := structField.Tag.Lookup("inject")
 		if !ok && onlyTagged {
 			continue
 		}
 
-		if name == "" {
-			name = fieldType.Name
-		}
-
 		if !field.CanSet() {
-			return fmt.Errorf("The field %v of %v is not settable.", fieldType, class)
+			return fmt.Errorf("The field '%v' of %v is not settable.", nameField, typ)
 		}
 
-		if val, err := self.resolve(name, fieldType.Type); err != nil {
-			return err
+		var instances []*Instance
+		var err error
+
+		if name != "" {
+
+			instances, err = self.getComponentInstances(name)
+			if err != nil {
+				return err
+			}
+
+			if len(instances) == 0 {
+				return fmt.Errorf("Can not inject field %v of %v: No component '%v' found.", nameField, typ, name)
+			}
+
+		} else {
+
+			name = defaultComponentName(typeField)
+			instances, err = self.getComponentInstances(name)
+			if err != nil {
+				return err
+			}
+
+			if len(instances) == 0 {
+				instances, err = self.getComponentInstances(nameField)
+				if err != nil {
+					return err
+				}
+			}
+
+			if len(instances) == 0 {
+				return fmt.Errorf("Can not inject field %v of %v: No component '%v' or '%v' found.", nameField, typ, name, nameField)
+			}
+
+		}
+
+		if val, err := packInstances(instances, structField.Type); err != nil {
+			return fmt.Errorf("Can not inject field %v of %v: %w", nameField, typ, err)
 		} else {
 			field.Set(val)
 		}
@@ -287,7 +409,7 @@ func recoveredCall(method reflect.Value, args []reflect.Value) (out []reflect.Va
 func (self *Container) callInjected(method reflect.Value) ([]reflect.Value, error) {
 
 	if method.Kind() != reflect.Func {
-		return []reflect.Value{}, fmt.Errorf("The argument is not a function: %v", method)
+		return nil, fmt.Errorf("Can not use '%v' as a function.", method)
 	}
 
 	methodType := method.Type()
@@ -295,57 +417,72 @@ func (self *Container) callInjected(method reflect.Value) ([]reflect.Value, erro
 	numIn := methodType.NumIn()
 	args := make([]reflect.Value, numIn)
 
-	out := []reflect.Value{}
-
-	injected := false
-
 	if numIn == 1 {
 
 		argType := methodType.In(0)
+		argName := defaultComponentName(argType)
 
-		ptr := argType.Kind() == reflect.Ptr
-		if ptr {
-			argType = argType.Elem()
+		instances, err := self.getComponentInstances(argName)
+		if err != nil {
+			return nil, err
 		}
 
-		name := argType.Name()
-		_, testPresence := self.testComponents[name]
-		_, corePresence := self.coreComponents[name]
-		if !testPresence && !corePresence {
+		if len(instances) != 0 {
 
-			arg := reflect.New(argType).Elem()
-
-			if err := self.inject(arg, false); err != nil {
-				return out, err
+			args[0], err = packInstances(instances, argType)
+			if err != nil {
+				return nil, err
 			}
 
+		} else {
+
+			ptr := argType.Kind() == reflect.Pointer
 			if ptr {
-				arg = arg.Addr()
+				argType = argType.Elem()
 			}
 
-			args[0] = arg
+			if argType.Kind() == reflect.Struct {
 
-			injected = true
+				arg := reflect.New(argType).Elem()
+				if err := self.inject(arg, false); err != nil {
+					return nil, err
+				}
+
+				if ptr {
+					arg = arg.Addr()
+				}
+
+				args[0] = arg
+
+			} else {
+
+				return nil, fmt.Errorf("No component '%v' found.", argName)
+
+			}
 
 		}
 
-	}
-
-	if !injected {
+	} else {
 
 		for i := 0; i < numIn; i++ {
 
 			argType := methodType.In(i)
+			argName := defaultComponentName(argType)
 
-			argName := argType.Name()
-			if argType.Kind() == reflect.Ptr {
-				argName = argType.Elem().Name()
+			instances, err := self.getComponentInstances(argName)
+			if err != nil {
+				return nil, err
 			}
 
-			if resolved, err := self.resolve(argName, argType); err != nil {
-				return out, err
-			} else {
-				args[i] = resolved
+			if len(instances) == 0 {
+				return nil,
+					fmt.Errorf("Can not inject parameter #%d: No component '%v' found.", i, argName)
+			}
+
+			args[i], err = packInstances(instances, argType)
+			if err != nil {
+				return nil,
+					fmt.Errorf("Can not inject parameter #%d: %w", i, err)
 			}
 
 		}
@@ -387,7 +524,7 @@ func (self *Container) CallInjected(method interface{}) error {
 // Close close all components.
 func (self *Container) Close() {
 
-	for _, instance := range self.sorted {
+	for _, instance := range self.closables {
 
 		instance.close(self)
 
@@ -395,7 +532,7 @@ func (self *Container) Close() {
 
 	}
 
-	self.sorted = nil
+	self.closables = nil
 
 }
 

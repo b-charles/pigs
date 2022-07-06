@@ -23,7 +23,21 @@ var _ = Describe("IOC call", func() {
 			var injectedContainer *Container
 
 			Expect(container.CallInjected(func(injected struct {
-				Container *Container `inject:"ApplicationContainer"`
+				Container *Container
+			}) {
+				injectedContainer = injected.Container
+			})).Should(Succeed())
+
+			Expect(injectedContainer).To(Equal(container))
+
+		})
+
+		It("should be able to get itself by name", func() {
+
+			var injectedContainer *Container
+
+			Expect(container.CallInjected(func(injected struct {
+				Container *Container `inject:"ioc.Container"`
 			}) {
 				injectedContainer = injected.Container
 			})).Should(Succeed())
@@ -34,7 +48,7 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject a simple component", func() {
 
-			container.PutFactory(SimpleStructFactory("A"), "A")
+			container.PutNamedFactory(SimpleStructFactory("A"), "A")
 
 			var injectedA *SimpleStruct
 
@@ -48,13 +62,26 @@ var _ = Describe("IOC call", func() {
 
 		})
 
+		It("should inject a simple deferenced component", func() {
+
+			container.PutNamedFactory(SimpleStructFactory("A"), "A")
+
+			var injectedA SimpleStruct
+
+			Expect(container.CallInjected(func(injected struct {
+				A SimpleStruct
+			}) {
+				injectedA = injected.A
+			})).Should(Succeed())
+
+			Expect(injectedA).To(Equal(SimpleStruct{"A"}))
+
+		})
+
 		It("should select not nil component", func() {
 
-			container.PutFactory(func() *SimpleStruct {
-				return nil
-			}, "NIL", "A")
-
-			container.PutFactory(SimpleStructFactory("A"), "NOT_NIL", "A")
+			container.PutNamedFactory(func() *SimpleStruct { return nil }, "NIL", "A")
+			container.PutNamedFactory(SimpleStructFactory("A"), "NOT_NIL", "A")
 
 			var injectedA *SimpleStruct
 
@@ -70,8 +97,8 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject test component if provided", func() {
 
-			container.PutFactory(SimpleStructFactory("A"), "A")
-			container.TestPutFactory(SimpleStructFactory("TEST"), "TEST", "A")
+			container.PutNamedFactory(SimpleStructFactory("A"), "A")
+			container.TestPutNamedFactory(SimpleStructFactory("TEST"), "TEST", "A")
 
 			var injectedA *SimpleStruct
 
@@ -100,8 +127,8 @@ var _ = Describe("IOC call", func() {
 
 		It("should return an error if too many components are provided", func() {
 
-			container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
-			container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
+			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")
+			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")
 
 			var injectedA *SimpleStruct
 
@@ -116,7 +143,7 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject an interface", func() {
 
-			container.PutFactory(SimpleStructFactory("A"), "A")
+			container.PutNamedFactory(SimpleStructFactory("A"), "A")
 
 			var injectedA SomethingDoer
 
@@ -132,8 +159,8 @@ var _ = Describe("IOC call", func() {
 
 		It("should restore 'core' configuration after a TestClear", func() {
 
-			container.PutFactory(SimpleStructFactory("A"), "A")
-			container.TestPutFactory(SimpleStructFactory("TEST"), "TEST", "A")
+			container.PutNamedFactory(SimpleStructFactory("A"), "A")
+			container.TestPutNamedFactory(SimpleStructFactory("TEST"), "TEST", "A")
 
 			var injectedA *SimpleStruct
 
@@ -167,11 +194,11 @@ var _ = Describe("IOC call", func() {
 
 	Describe("with slice injection", func() {
 
-		It("should inject a slice", func() {
+		It("should inject a slice of pointers", func() {
 
-			container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
-			container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
-			container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
+			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")
+			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")
+			container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")
 
 			var injectedA []*SimpleStruct
 
@@ -188,15 +215,36 @@ var _ = Describe("IOC call", func() {
 
 		})
 
+		It("should inject a slice of values", func() {
+
+			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")
+			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")
+			container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")
+
+			var injectedA []SimpleStruct
+
+			Expect(container.CallInjected(func(injected struct {
+				A []SimpleStruct
+			}) {
+				injectedA = injected.A
+			})).Should(Succeed())
+
+			Expect(injectedA).Should(ConsistOf(
+				SimpleStruct{"A1"},
+				SimpleStruct{"A2"},
+				SimpleStruct{"A3"}))
+
+		})
+
 		It("should inject a slice without nil components", func() {
 
-			container.PutFactory(func() *SimpleStruct {
+			container.PutNamedFactory(func() *SimpleStruct {
 				return nil
 			}, "NIL", "A")
 
-			container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
-			container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
-			container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
+			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")
+			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")
+			container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")
 
 			var injectedA []*SimpleStruct
 
@@ -215,9 +263,9 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject a slice of interface", func() {
 
-			container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
-			container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
-			container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
+			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")
+			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")
+			container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")
 
 			var injectedA []SomethingDoer
 
@@ -238,11 +286,11 @@ var _ = Describe("IOC call", func() {
 
 	Describe("with map injection", func() {
 
-		It("should inject a map", func() {
+		It("should inject a map of pointers", func() {
 
-			container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
-			container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
-			container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
+			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")
+			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")
+			container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")
 
 			var injectedA map[string]*SimpleStruct
 
@@ -259,15 +307,36 @@ var _ = Describe("IOC call", func() {
 
 		})
 
+		It("should inject a map of values", func() {
+
+			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")
+			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")
+			container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")
+
+			var injectedA map[string]SimpleStruct
+
+			Expect(container.CallInjected(func(injected struct {
+				A map[string]SimpleStruct
+			}) {
+				injectedA = injected.A
+			})).Should(Succeed())
+
+			Expect(injectedA).Should(HaveLen(3))
+			Expect(injectedA).Should(HaveKeyWithValue("A1", SimpleStruct{"A1"}))
+			Expect(injectedA).Should(HaveKeyWithValue("A2", SimpleStruct{"A2"}))
+			Expect(injectedA).Should(HaveKeyWithValue("A3", SimpleStruct{"A3"}))
+
+		})
+
 		It("should inject a map without nil components", func() {
 
-			container.PutFactory(func() *SimpleStruct {
+			container.PutNamedFactory(func() *SimpleStruct {
 				return nil
 			}, "NIL", "A")
 
-			container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
-			container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
-			container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
+			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")
+			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")
+			container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")
 
 			var injectedA map[string]*SimpleStruct
 
@@ -286,9 +355,9 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject a map of interface", func() {
 
-			container.PutFactory(SimpleStructFactory("A1"), "A1", "A")
-			container.PutFactory(SimpleStructFactory("A2"), "A2", "A")
-			container.PutFactory(SimpleStructFactory("A3"), "A3", "A")
+			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")
+			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")
+			container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")
 
 			var injectedA map[string]SomethingDoer
 

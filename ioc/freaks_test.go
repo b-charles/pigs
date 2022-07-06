@@ -18,7 +18,7 @@ var _ = Describe("IOC freaks show", func() {
 
 	It("should handle not struct component", func() {
 
-		container.Put(NewMap("Hello", "World"), "MyMap")
+		container.Put(NewMap("Hello", "World"))
 
 		var myMap MyMap
 		Expect(container.CallInjected(func(injected MyMap) {
@@ -32,8 +32,8 @@ var _ = Describe("IOC freaks show", func() {
 
 	It("should inject not struct components", func() {
 
-		container.Put(NewMap("Hello", "World"), "MyMap")
-		container.PutFactory(CreateWrapMap, "Wrap")
+		container.PutNamed(NewMap("Hello", "World"), "MyMap")
+		container.PutNamedFactory(CreateWrapMap, "Wrap")
 
 		var wrap MyMap
 		Expect(container.CallInjected(func(injected struct {
@@ -49,10 +49,10 @@ var _ = Describe("IOC freaks show", func() {
 
 	It("should inject not struct components in a slice", func() {
 
-		container.Put(NewMap("Hello", "World"), "MyMap1", "Maps")
-		container.Put(NewMap("Hi", "Everybody"), "MyMap2", "Maps")
+		container.PutNamed(NewMap("Hello", "World"), "MyMap1", "Maps")
+		container.PutNamed(NewMap("Hi", "Everybody"), "MyMap2", "Maps")
 
-		container.PutFactory(CreateSuperMap, "MySuperMap")
+		container.PutFactory(CreateSuperMap)
 
 		var super MySuperMap
 		Expect(container.CallInjected(func(injected MySuperMap) {
@@ -67,10 +67,10 @@ var _ = Describe("IOC freaks show", func() {
 
 	It("should inject not struct components in a map", func() {
 
-		container.Put(NewMap("Hello", "World"), "MyMap1", "Maps")
-		container.Put(NewMap("Hi", "Everybody"), "MyMap2", "Maps")
+		container.PutNamed(NewMap("Hello", "World"), "MyMap1", "Maps")
+		container.PutNamed(NewMap("Hi", "Everybody"), "MyMap2", "Maps")
 
-		container.PutFactory(CreateHyperMap, "MyHyperMap")
+		container.PutFactory(CreateHyperMap)
 
 		var hyper MyHyperMap
 		Expect(container.CallInjected(func(injected MyHyperMap) {
