@@ -30,7 +30,24 @@ A component is something: a struct, a pointer, a map, a chan, an integer... It's
 
 A container is a set of components: it manages the lifecycle of each component and take in charge the injection process. To know what component should be injected, the container look after names: each injection defines the name (main name or alias) of the component that should be injected. If there is a problem of type (the component injected doesn't correspond to the expected type), the container detects it and returns an error. It's the responsibility of the developer to choose wisely the names of the components to avoid collisions, and to define components and injections that are compatible.
 
-The container is a managed component itself and can be accessed by the name `ioc.Container`.
+The container is a managed component itself and can be accessed by the name `github.com/b-charles/pigs/ioc/Container`.
+
+### Definition and Naming
+
+Defining each name and alias through a string can be combersome and hazardous in case of refactoring. It's always possible to define the main name and aliases with strings, but the framework offers other options.
+
+For main names, the framework can do some reflection to deference the type (if necessary) and use [the methods `PkgName` and `Name` of `reflect.Type`](https://pkg.go.dev/reflect#Type) to compute a default name, with the format `<pkgName>/<name>`. That name should be unique for a type, which means that if several components with the same type should be defined, the developper - you - has to name "manually" each component.
+
+Alias definition are more tricky: aliases are about the interfaces implemented by the component[^duck], and Go doesn't provide a way to access to a type as a value without having a value of this type, like [the `.class` syntax in Java](https://docs.oracle.com/javase/tutorial/reflect/class/classNew.html) or direct access in [Python](https://docs.python.org/3/reference/compound_stmts.html#class-definitions) or [Ruby](https://ruby-doc.org/docs/ruby-doc-bundle/Manual/man-1.4/syntax.html#const). (I know it's not very fair to compare Go with interpreted langages, but it's more to show what we need.) So, the best way found (so far) is to use a function with anonymous inputs, without output and with an empty body:
+```go
+func(SomeInterface){}
+```
+If this function is given in place of an alias, the framework analyzes the inputs types and, like the main name, use the method `PkgName` and `Name` of `reflect.Type` to generate an alias. Several aliases can be given in one function, simply use more input argument:
+```go
+func(SomeInterface, AnotherInterface){}
+```
+
+[^duck]: the concept of aliasing is not very in line with the spirit of the duck typing of Go.
 
 ### Injections
 
@@ -40,7 +57,7 @@ The framework is based on two types of injection: injection of structures and in
 
 At different points in the framework, it appears the need to inject a structure, or a pointer to a structure. Two flavors are possible: "tagged only" and "all injected".
 
-For the mode "tagged only", only the tagged `inject` fields are injected. The value of the tag defines the name (or the alias) of the component to inject. If the value of the tag is empty, a default name is searched based on [the method `String` of `reflect.Type`](https://pkg.go.dev/reflect#Type) (the type is deferenced if needed). If no component is defined by this name, the name of the field is used in place of. So if this variable `injected` is injected:
+For the mode "tagged only", only the tagged `inject` fields are injected. The value of the tag defines the name (or the alias) of the component to inject. If the value of the tag is empty, a default name is computed, with the same process than [the default naming of main names](#definition-and-naming). If no component is defined by this name, the name of the field is used. So if this variable `injected` is injected:
 ```go
 package mypkg
 
@@ -52,7 +69,7 @@ type MyInjectedStruct struct {
 
 var injected *MyInjectedStruct = &MyInjectedStruct{}
 ```
-the first field `NotInjected` is not injected, the second field `FirstInject` is injected with a component named (or aliased) `Something`, and the third field is injected with a component named (or aliased) `mypkg.AnotherInterface` or, if no component is found, with a component named or aliased `SecondInject`. Please note that each injected field should be settable (so exported, with a name beginning with an upper case).
+the first field `NotInjected` is not injected, the second field `FirstInject` is injected with a component named (or aliased) `Something`, and the third field is injected with a component named (or aliased) `<path of mypkg module>/mypkg/AnotherInterface` or, if no component is found, with a component named or aliased `SecondInject`. Please note that each injected field should be settable (so exported, with a name beginning with an upper case).
 
 For the mode "all injected", every field should be injected, and the tag `inject` can be used only to define the correct name of the component to inject.
 
@@ -64,16 +81,16 @@ The first form is when the function is defined with none, one or several argumen
 ```go
 func InjectedFunc(first mypkg.SomeInterface, second *anotherlib.RandomComponent) { ... }
 ```
-If the container calls the function, the first argument will be injected with a component named `mypkg.SomeInterface` and the second argument with a component named `anotherlib.RandomComponent`: on the contrary of structure injection, note that there is no fallback on the name of the argument. Of course, the function can be defined without any argument.
+If the container calls the function, the first argument will be injected with a component named `<path of mypkg module>/mypkg/SomeInterface` and the second argument with a component named `<path of anotherlib module>/anotherlib/RandomComponent`: on the contrary of structure injection, note that there is no fallback on the name of the argument. Of course, the function can be defined without any argument.
 
-This first form is pretty clear but not very flexible. The other is little more messy, but more useful: the function is defined with only one argument, a structure or a pointer to a structure, which will be injected as defined in the section [Injection of structures](#injection-of-structures), with the flavor "all injected". The type of this sole argument can be properly defined or defined directly in the function:
+This first form is pretty clear but not very flexible (you can't define arbitrary injection names). The other is little more messy, but more powerful: the function is defined with only one argument, a structure or a pointer to a structure, which will be injected as defined in the section [Injection of structures](#injection-of-structures), with the flavor "all injected". The type of this sole argument can be properly defined or defined directly in the function:
 ```go
 func injectedFunc(injected struct {
     SomeComponent mypkg.SomeInterface
     Another RandomInterface `inject:"RandomComponent"`
 }) { ... }
 ```
-Here, the argument `injected` will be injected with a component named `mypkg.SomeComponent` and another one named `RandomComponent`.
+Here, the argument `injected` will be injected with a component named `<path of mypkg module>/mypkg/SomeComponent` and another one named `RandomComponent`.
 
 #### Auto-discovery injection
 
@@ -85,7 +102,7 @@ type MyInjectedStruct struct {
 
 var injected *MyInjectedStruct = &MyInjectedStruct{}
 ```
-Here, if `injected` is injected by the container, the field `AllComponents` will contains every components defined with the alias `"MagicService"` (at the condition that all respect the interface `SomeInterface`).
+Here, if `injected` is injected by the container, the field `AllComponents` will contains every components defined with the alias `"MagicService"` (at the condition that all respect the interface `SomeInterface`). The injected slice can not be empty: at leat one component should be found, or the framework returns an error.
 
 With the same spirit, you can also inject a map of components sharing a same alias, where the keys (of type `string`) are the main names of the associated components:
 ```go
@@ -95,6 +112,7 @@ type MyInjectedStruct struct {
 
 var injected *MyInjectedStruct = &MyInjectedStruct{}
 ```
+Again, the injected map can not be empty, and at least one component with that alias should be found.
 
 #### Testing
 
@@ -131,9 +149,9 @@ func init() {
     }
 }
 ```
-Recording a component doesn't inject it (not yet). It is only recorded as a not yet initialized component. As you can see, the function `Put` returns an error if something bad had happened (e.g. a component with the same main name is already registered).
+Recording a component doesn't inject it (not yet). It is only recorded as a not yet initialized component. As you can see, the function `Put` returns an error if something bad had happened (e.g. a component with the same main name is already registered). Aliases can be defined with strings, or with one or several weird functions, as explained in [Definition and Naming](#definition-and-naming).
 
-You can also use the function `ioc.Put` to record the component and let the framework to choose the main name, again built with the the method `String` of `reflect.Type` like the injection default name.
+You can also use the function `ioc.Put` to record the component and let the framework to choose the main name (again, see [Definition and Naming](#definition-and-naming)):
 ```go
 type DemoComponent struct { ... }
 
@@ -293,7 +311,7 @@ type ComponentA struct {}
 func (self *ComponentA) doSmallStuff() error { ... }
 
 func init() {
-    if err := ioc.Put(&ComponentA{}, "pkg.SmallStuffDoer"); err != nil {
+    if err := ioc.Put(&ComponentA{}, func(SmallStuffDoer){}); err != nil {
         panic(err)
     }
 }
@@ -344,7 +362,7 @@ var _ = Describe("App tests", func() {
     Describe("Component B should work", func() {
 
         BeforeEach(func() {
-            ioc.TestPut(&SmallStuffDoerMock{}, "pkg.SmallStuffDoer")
+            ioc.TestPut(&SmallStuffDoerMock{}, func(SmallStuffDoer){})
         }
 
         It("should work with the mock", func() {
@@ -362,4 +380,13 @@ var _ = Describe("App tests", func() {
 
 })
 ```
+
+### Container lifecycle awareness
+
+You can define some special components which will be called during the exploitation and destruction phases (`CallInjected` and `Close` methods). That components should implement the desired interface and be declared with the correct alias:
+ * `github.com/b-charles/pigs/ioc/PreCallAwared`: Any component with that alias (and so implementing the `PreCallAwared` interface) will be call at the beginning of the `CallInjected` method.
+ * `github.com/b-charles/pigs/ioc/PostInstAwared`: Components with that alias will be called in `CallInjected`, after the instanciation and initialisation of the arguments of the given method, but before actually calling it.
+ * `github.com/b-charles/pigs/ioc/PostCallAwared`: Components with that alias are called at the end of `CallInjected` method.
+ * `github.com/b-charles/pigs/ioc/PreCloseAwared`: Components with that alias are called at the beginning of `Close` method.
+ * `github.com/b-charles/pigs/ioc/PostCloseAwared`: Components with that alias are called at the end of `Close` method.
 
