@@ -12,39 +12,39 @@ func ContainerInstance() *Container {
 	return instance
 }
 
-func PutNamedFactory(factory interface{}, name string, aliases ...string) error {
+func PutNamedFactory(factory any, name string, aliases ...any) error {
 	return ContainerInstance().PutNamedFactory(factory, name, aliases...)
 }
 
-func PutNamed(object interface{}, name string, aliases ...string) error {
+func PutNamed(object any, name string, aliases ...any) error {
 	return ContainerInstance().PutNamed(object, name, aliases...)
 }
 
-func PutFactory(factory interface{}, aliases ...string) error {
+func PutFactory(factory any, aliases ...any) error {
 	return ContainerInstance().PutFactory(factory, aliases...)
 }
 
-func Put(object interface{}, aliases ...string) error {
+func Put(object any, aliases ...any) error {
 	return ContainerInstance().Put(object, aliases...)
 }
 
-func TestPutNamedFactory(factory interface{}, name string, aliases ...string) error {
+func TestPutNamedFactory(factory any, name string, aliases ...any) error {
 	return ContainerInstance().TestPutNamedFactory(factory, name, aliases...)
 }
 
-func TestPutNamed(object interface{}, name string, aliases ...string) error {
+func TestPutNamed(object any, name string, aliases ...any) error {
 	return ContainerInstance().TestPutNamed(object, name, aliases...)
 }
 
-func TestPutFactory(factory interface{}, aliases ...string) error {
+func TestPutFactory(factory any, aliases ...any) error {
 	return ContainerInstance().TestPutFactory(factory, aliases...)
 }
 
-func TestPut(object interface{}, aliases ...string) error {
+func TestPut(object any, aliases ...any) error {
 	return ContainerInstance().TestPut(object, aliases...)
 }
 
-func CallInjected(method interface{}) error {
+func CallInjected(method any) error {
 	return ContainerInstance().CallInjected(method)
 }
 

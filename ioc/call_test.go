@@ -37,7 +37,7 @@ var _ = Describe("IOC call", func() {
 			var injectedContainer *Container
 
 			Expect(container.CallInjected(func(injected struct {
-				Container *Container `inject:"ioc.Container"`
+				Container *Container `inject:"github.com/b-charles/pigs/ioc/Container"`
 			}) {
 				injectedContainer = injected.Container
 			})).Should(Succeed())
