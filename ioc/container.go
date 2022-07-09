@@ -6,6 +6,14 @@ import (
 	"time"
 )
 
+// Awareness
+
+var preCallAwaredName = unsafeDefaultAlias(func(PreCallAwared) {})
+var postInstAwaredName = unsafeDefaultAlias(func(PostInstAwared) {})
+var postCallAwaredName = unsafeDefaultAlias(func(PostCallAwared) {})
+var preCloseAwaredName = unsafeDefaultAlias(func(PreCloseAwared) {})
+var postCloseAwaredName = unsafeDefaultAlias(func(PostCloseAwared) {})
+
 // CONTAINER
 
 type Container struct {
@@ -27,6 +35,12 @@ func NewContainer() *Container {
 		time.Now()}
 
 	container.Put(container)
+
+	container.Put(&noopPreCallAwaredHandler{}, preCallAwaredName)
+	container.Put(&noopPostInstAwaredHandler{}, postInstAwaredName)
+	container.Put(&noopPostCallAwaredHandler{}, postCallAwaredName)
+	container.Put(&noopPreCloseAwaredHandler{}, preCloseAwaredName)
+	container.Put(&noopPostCloseAwaredHandler{}, postCloseAwaredName)
 
 	return container
 
@@ -621,12 +635,37 @@ func (self *Container) CallInjected(method any) error {
 
 	methodValue := reflect.ValueOf(method)
 
+	preCallAwared, err := self.getComponentInstances(preCallAwaredName)
+	postInstAwared, err := self.getComponentInstances(postInstAwaredName)
+	postCallAwared, err := self.getComponentInstances(postCallAwaredName)
+
+	for _, awared := range preCallAwared {
+		e := awared.precall(methodValue)
+		if e != nil {
+			return e
+		}
+	}
+
 	args, err := self.getArguments(methodValue)
 	if err != nil {
 		return err
 	}
 
+	for _, awared := range postInstAwared {
+		e := awared.postinst(methodValue, args)
+		if e != nil {
+			return e
+		}
+	}
+
 	outs := methodValue.Call(args)
+
+	for _, awared := range postCallAwared {
+		e := awared.postcall(methodValue, outs)
+		if e != nil {
+			return e
+		}
+	}
 
 	if len(outs) == 1 {
 		if err, ok := outs[0].Interface().(error); !ok {
@@ -649,7 +688,12 @@ func (self *Container) CallInjected(method any) error {
 // Close close all components.
 func (self *Container) Close() {
 
+	preCloseAwared, _ := self.getComponentInstances(preCloseAwaredName)
+	postCloseAwared, _ := self.getComponentInstances(postCloseAwaredName)
 
+	for _, awared := range preCloseAwared {
+		awared.preclose()
+	}
 
 	for _, instance := range self.closables {
 		instance.close(self)
@@ -657,6 +701,10 @@ func (self *Container) Close() {
 	}
 
 	self.closables = nil
+
+	for _, awared := range postCloseAwared {
+		awared.postclose()
+	}
 
 }
 
