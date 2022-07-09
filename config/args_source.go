@@ -1,10 +1,10 @@
-package args
+package config
 
 import (
 	"os"
 	"regexp"
 
-	. "github.com/b-charles/pigs/config/confsources"
+	"github.com/b-charles/pigs/ioc"
 )
 
 var valueRegexp *regexp.Regexp = regexp.MustCompile("^--([^=]+)=(.*)$")
@@ -50,13 +50,22 @@ func ParseArgs(args []string) map[string]string {
 
 }
 
-func NewArgsConfigSource() *SimpleConfigSource {
+type ArgsConfigSource struct {
+	*SimpleConfigSource
+}
+
+func NewArgsConfigSource() *ArgsConfigSource {
 
 	env := ParseArgs(os.Args[1:])
 
-	return &SimpleConfigSource{
-		Priority: CONFIG_SOURCE_PRIORITY_ARGS,
-		Env:      env,
-	}
+	return &ArgsConfigSource{
+		&SimpleConfigSource{
+			Priority: CONFIG_SOURCE_PRIORITY_ARGS,
+			Env:      env,
+		}}
 
+}
+
+func init() {
+	ioc.PutFactory(NewArgsConfigSource, func(ConfigSource) {})
 }

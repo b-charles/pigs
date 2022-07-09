@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/b-charles/pigs/ioc"
 )
 
 /*
@@ -64,6 +66,17 @@ func CreateConfiguration(sources []ConfigSource) Configuration {
 	}
 
 	return env
+
+}
+
+func init() {
+
+	ioc.PutFactory(
+		func(injected struct {
+			ConfigSources []ConfigSource
+		}) Configuration {
+			return CreateConfiguration(injected.ConfigSources)
+		})
 
 }
 

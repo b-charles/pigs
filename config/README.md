@@ -81,9 +81,16 @@ The `Configuration` component is simply defined as a map of string to string:
 type Configuration map[string]string
 ```
 
-The module manages the merging of all sources in this component, and application needing to be configured can retrieve it by its name `Configuration`.
+The module manages the merging of all sources in this component, and resolve placeholders: for each value, each occurance of the pattern `${<myvalue>}` is replaced with the value of `<myvalue>`. So, if a config source defines a value `name` with `Batman` and another value `whoami` with `I'm ${name}`, the resolving process will convert `whoami` to `I'm Batman`. Placeholders can be chained and nested:
+| name | value | resolved |
+| --- | --- | --- |
+| `ironman` | `Tony Stark` | `Tony Stark` |
+| `super` | `${ironman}` | `Tony Stark` |
+| `best` | `${super}` | `Tony Stark` |
+| `what` | `iron` | `iron` |
+| `who` | `${${what}man}` | `Tony Stark` |
 
-Of course, modifying the component is not a good idea: define and use a dedicated `ConfigSource` instead.
+Application needing to be configured can retrieve it by its name `github.com/b-charles/pigs/config\Configuration`. Of course, modifying the component or the contained value is not a good idea: define and use a dedicated `ConfigSource` instead.
 
 ## And now?
 

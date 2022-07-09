@@ -1,10 +1,10 @@
-package envvar
+package config
 
 import (
 	"os"
 	"strings"
 
-	. "github.com/b-charles/pigs/config/confsources"
+	"github.com/b-charles/pigs/ioc"
 )
 
 func convertEnvVarKey(key string) string {
@@ -24,13 +24,22 @@ func ParseEnvVar(envvar []string) map[string]string {
 
 }
 
-func NewEnvVarConfigSource() *SimpleConfigSource {
+type EnvVarConfigSource struct {
+	*SimpleConfigSource
+}
+
+func NewEnvVarConfigSource() *EnvVarConfigSource {
 
 	env := ParseEnvVar(os.Environ())
 
-	return &SimpleConfigSource{
-		Priority: CONFIG_SOURCE_PRIORITY_ENV_VAR,
-		Env:      env,
-	}
+	return &EnvVarConfigSource{
+		&SimpleConfigSource{
+			Priority: CONFIG_SOURCE_PRIORITY_ENV_VAR,
+			Env:      env,
+		}}
 
+}
+
+func init() {
+	ioc.PutFactory(NewEnvVarConfigSource, func(ConfigSource) {})
 }

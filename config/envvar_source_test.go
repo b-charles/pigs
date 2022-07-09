@@ -1,17 +1,10 @@
-package envvar_test
+package config_test
 
 import (
-	"testing"
-
-	. "github.com/b-charles/pigs/config/confsources/envvar"
+	. "github.com/b-charles/pigs/config"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
-
-func TestConfsources(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Env var config sources Suite")
-}
 
 var _ = Describe("Envvar config source", func() {
 

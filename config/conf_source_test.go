@@ -1,17 +1,10 @@
-package conf_test
+package config_test
 
 import (
-	"testing"
-
-	. "github.com/b-charles/pigs/config/confsources/conf"
+	. "github.com/b-charles/pigs/config"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
-
-func TestConfsources(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Configurable config sources Suite")
-}
 
 var _ = Describe("Default config source", func() {
 

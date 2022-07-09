@@ -1,17 +1,10 @@
-package args_test
+package config_test
 
 import (
-	"testing"
-
-	. "github.com/b-charles/pigs/config/confsources/args"
+	. "github.com/b-charles/pigs/config"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
-
-func TestConfsources(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Args config sources Suite")
-}
 
 var _ = Describe("Args", func() {
 

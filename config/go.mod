@@ -3,7 +3,7 @@ module github.com/b-charles/pigs/config
 go 1.18
 
 require (
-	github.com/b-charles/pigs/ioc v0.0.0-00010101000000-000000000000
+	github.com/b-charles/pigs/ioc v0.3.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.19.0
 )
