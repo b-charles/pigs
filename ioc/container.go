@@ -363,6 +363,7 @@ func (self *Container) getComponentInstances(name string) ([]*Instance, error) {
 // INJECTION
 
 var string_type reflect.Type = reflect.TypeOf("")
+var error_type = reflect.TypeOf(fmt.Errorf(""))
 
 // packInstance converts one instance to target type (direct, ptr or addr).
 func packInstance(instance *Instance, target reflect.Type) (reflect.Value, error) {
@@ -634,6 +635,19 @@ func (self *Container) CallInjected(method any) error {
 
 	methodValue := reflect.ValueOf(method)
 
+	typ := methodValue.Type()
+	if typ.Kind() != reflect.Func {
+		return fmt.Errorf("The input should a function, not a %v.", typ)
+	}
+	numOut := typ.NumOut()
+	if numOut > 1 {
+		return fmt.Errorf("The method should return none or one output, not %d.", numOut)
+	} else if numOut == 1 {
+		if outType := typ.Out(0); outType != error_type {
+			return fmt.Errorf("The output of the method should be an error, not a '%v'.", outType)
+		}
+	}
+
 	preCallAwared, err := self.getComponentInstances(preCallAwaredName)
 	if err != nil {
 		self.closeInstances([]*Instance{}, []*Instance{})
@@ -681,16 +695,10 @@ func (self *Container) CallInjected(method any) error {
 
 	self.closeInstances(preCloseAwared, postCloseAwared)
 
-	if len(outs) == 1 {
-		if err, ok := outs[0].Interface().(error); !ok {
-			return fmt.Errorf("The output of the method should be an error, not a '%v'.", outs[0].Type())
-		} else if err != nil {
+	if numOut == 1 {
+		if err := outs[0].Interface().(error); err != nil {
 			return err
 		}
-	}
-
-	if len(outs) > 1 {
-		return fmt.Errorf("The method should return none or one output, not %d.", len(outs))
 	}
 
 	return nil
