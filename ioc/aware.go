@@ -26,18 +26,6 @@ func (self noopPostInstAwaredHandler) Postinst(reflect.Value, []reflect.Value) e
 	return nil
 }
 
-// postCall
-
-type PostCallAwared interface {
-	Postcall(method reflect.Value, outs []reflect.Value) error
-}
-
-type noopPostCallAwaredHandler struct{}
-
-func (self noopPostCallAwaredHandler) Postcall(reflect.Value, []reflect.Value) error {
-	return nil
-}
-
 // preClose
 
 type PreCloseAwared interface {

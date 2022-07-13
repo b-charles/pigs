@@ -246,17 +246,13 @@ func init() {
 
 func main() {
 
-    err := ioc.CallInjected(func(component *MyMainComponent) {
+    ioc.CallInjected(func(component *MyMainComponent) {
         component.start()
     })
 
-    if err != nil {
-        panic(err)
-    }
-
 }
 ```
-As you should have guessed, the function `CallInjected` take as sole argument a function that will be injected (see [Injection of functions](#injection-of-functions)). The given function can return nothing or an error. The method `CallInjected` return an error if something had happened.
+As you should have guessed, the function `CallInjected` take as sole argument a function that will be injected (see [Injection of functions](#injection-of-functions)). The given function can return nothing or an error. The method `CallInjected` panics if an error occurs, but you can also use `UnsureCallInjected` which doen't panic but returns an error if something had happened.
 
 ### Destruction
 

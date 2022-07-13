@@ -44,12 +44,15 @@ func TestPut(object any, aliases ...any) error {
 	return ContainerInstance().TestPut(object, aliases...)
 }
 
-func CallInjected(method any) error {
-	return ContainerInstance().CallInjected(method)
+func CallInjected(method any) {
+	err := ContainerInstance().CallInjected(method)
+	if err != nil {
+		panic(err)
+	}
 }
 
-func Close() {
-	ContainerInstance().Close()
+func UnsureCallInjected(method any) error {
+	return ContainerInstance().CallInjected(method)
 }
 
 func ClearTests() {

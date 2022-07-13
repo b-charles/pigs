@@ -50,8 +50,6 @@ var _ = Describe("IOC post-init and close", func() {
 			injectedThird = injected.Third
 		})).Should(Succeed())
 
-		container.Close()
-
 		Expect(injectedThird.OrderRegister.CloseOrder).Should(Equal([]string{"FIRST", "SECOND", "THIRD"}))
 
 	})

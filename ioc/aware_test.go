@@ -60,29 +60,18 @@ var _ = Describe("Container awareness", func() {
 		postinst := &AwaredCallback{reforder, 0}
 		container.PutNamed(postinst, "PostInst", func(PostInstAwared) {})
 
-		postcall := &AwaredCallback{reforder, 0}
-		container.PutNamed(postcall, "PostCall", func(PostCallAwared) {})
-
-		container.CallInjected(func() {})
-
-		Expect(precall.order).To(Equal(1))
-		Expect(postinst.order).To(Equal(2))
-		Expect(postcall.order).To(Equal(3))
-
-	})
-
-	It("should call the Close callbacks in the correct order", func() {
-
 		preclose := &AwaredCallback{reforder, 0}
 		container.PutNamed(preclose, "PreClose", func(PreCloseAwared) {})
 
 		postclose := &AwaredCallback{reforder, 0}
 		container.PutNamed(postclose, "PostClose", func(PostCloseAwared) {})
 
-		container.Close()
+		container.CallInjected(func() {})
 
-		Expect(preclose.order).To(Equal(1))
-		Expect(postclose.order).To(Equal(2))
+		Expect(precall.order).To(Equal(1))
+		Expect(postinst.order).To(Equal(2))
+		Expect(preclose.order).To(Equal(3))
+		Expect(postclose.order).To(Equal(4))
 
 	})
 

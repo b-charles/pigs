@@ -10,7 +10,6 @@ import (
 
 var preCallAwaredName = unsafeDefaultAlias(func(PreCallAwared) {})
 var postInstAwaredName = unsafeDefaultAlias(func(PostInstAwared) {})
-var postCallAwaredName = unsafeDefaultAlias(func(PostCallAwared) {})
 var preCloseAwaredName = unsafeDefaultAlias(func(PreCloseAwared) {})
 var postCloseAwaredName = unsafeDefaultAlias(func(PostCloseAwared) {})
 
@@ -38,7 +37,6 @@ func NewContainer() *Container {
 
 	container.Put(&noopPreCallAwaredHandler{}, preCallAwaredName)
 	container.Put(&noopPostInstAwaredHandler{}, postInstAwaredName)
-	container.Put(&noopPostCallAwaredHandler{}, postCallAwaredName)
 	container.Put(&noopPreCloseAwaredHandler{}, preCloseAwaredName)
 	container.Put(&noopPostCloseAwaredHandler{}, postCloseAwaredName)
 
@@ -56,7 +54,8 @@ func (self *Container) CreationTime() time.Time {
 // defaultName returns the default name of a component type.
 func defaultComponentName(typ reflect.Type) string {
 
-	if typ.Kind() == reflect.Pointer {
+	if typ.Kind() == reflect.Pointer || typ.Kind() == reflect.Slice ||
+		(typ.Kind() == reflect.Map && typ.Key() == string_type) {
 		typ = typ.Elem()
 	}
 
@@ -636,8 +635,28 @@ func (self *Container) CallInjected(method any) error {
 	methodValue := reflect.ValueOf(method)
 
 	preCallAwared, err := self.getComponentInstances(preCallAwaredName)
+	if err != nil {
+		self.closeInstances([]*Instance{}, []*Instance{})
+		return err
+	}
+
 	postInstAwared, err := self.getComponentInstances(postInstAwaredName)
-	postCallAwared, err := self.getComponentInstances(postCallAwaredName)
+	if err != nil {
+		self.closeInstances([]*Instance{}, []*Instance{})
+		return err
+	}
+
+	preCloseAwared, err := self.getComponentInstances(preCloseAwaredName)
+	if err != nil {
+		self.closeInstances([]*Instance{}, []*Instance{})
+		return err
+	}
+
+	postCloseAwared, err := self.getComponentInstances(postCloseAwaredName)
+	if err != nil {
+		self.closeInstances(preCloseAwared, []*Instance{})
+		return err
+	}
 
 	for _, awared := range preCallAwared {
 		e := awared.precall(methodValue)
@@ -660,12 +679,7 @@ func (self *Container) CallInjected(method any) error {
 
 	outs := methodValue.Call(args)
 
-	for _, awared := range postCallAwared {
-		e := awared.postcall(methodValue, outs)
-		if e != nil {
-			return e
-		}
-	}
+	self.closeInstances(preCloseAwared, postCloseAwared)
 
 	if len(outs) == 1 {
 		if err, ok := outs[0].Interface().(error); !ok {
@@ -683,13 +697,7 @@ func (self *Container) CallInjected(method any) error {
 
 }
 
-// CLOSE
-
-// Close close all components.
-func (self *Container) Close() {
-
-	preCloseAwared, _ := self.getComponentInstances(preCloseAwaredName)
-	postCloseAwared, _ := self.getComponentInstances(postCloseAwaredName)
+func (self *Container) closeInstances(preCloseAwared []*Instance, postCloseAwared []*Instance) {
 
 	for _, awared := range preCloseAwared {
 		awared.preclose()
@@ -700,8 +708,6 @@ func (self *Container) Close() {
 		delete(self.instances, instance.producer)
 	}
 
-	self.closables = nil
-
 	for _, awared := range postCloseAwared {
 		awared.postclose()
 	}
@@ -711,8 +717,7 @@ func (self *Container) Close() {
 // ClearTests close all components and delete all registered Component for tests.
 func (self *Container) ClearTests() {
 
-	self.Close()
-
+	self.instances = make(map[*Component]*Instance)
 	self.testComponents = make(map[string][]*Component)
 
 }

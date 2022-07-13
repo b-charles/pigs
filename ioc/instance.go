@@ -120,22 +120,6 @@ func (self *Instance) postinst(method reflect.Value, args []reflect.Value) error
 
 }
 
-// postcall call the postcall method (panics if not defined).
-func (self *Instance) postcall(method reflect.Value, outs []reflect.Value) error {
-
-	awared, ok := self.value.Interface().(PostCallAwared)
-	if !ok {
-		panic(fmt.Sprintf("The component '%v' should be a PostCallAwared.", self))
-	}
-
-	err := awared.Postcall(method, outs)
-	if err != nil {
-		return fmt.Errorf("Error during call of postcall of '%v': %w", self, err)
-	}
-	return nil
-
-}
-
 // preclose close the preclose method (panics if not defined).
 func (self *Instance) preclose() {
 
