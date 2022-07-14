@@ -16,22 +16,26 @@ var postCloseAwaredName = unsafeDefaultAlias(func(PostCloseAwared) {})
 // CONTAINER
 
 type Container struct {
-	coreComponents map[string][]*Component
-	testComponents map[string][]*Component
-	instances      map[*Component]*Instance
-	closables      []*Instance
-	creationTime   time.Time
+	coreComponents  map[string][]*Component
+	testComponents  map[string][]*Component
+	creationTime    time.Time
+	instances       map[*Component]*Instance
+	preCloseAwared  []*Instance
+	postCloseAwared []*Instance
+	closables       []*Instance
 }
 
 // NewContainer creates a pointer to a new initialized Container.
 func NewContainer() *Container {
 
 	container := &Container{
-		make(map[string][]*Component),
-		make(map[string][]*Component),
-		make(map[*Component]*Instance),
-		make([]*Instance, 0),
-		time.Now()}
+		coreComponents:  make(map[string][]*Component),
+		testComponents:  make(map[string][]*Component),
+		creationTime:    time.Now(),
+		instances:       map[*Component]*Instance{},
+		preCloseAwared:  []*Instance{},
+		postCloseAwared: []*Instance{},
+		closables:       []*Instance{}}
 
 	container.Put(container)
 
@@ -633,6 +637,8 @@ func (self *Container) callInjected(method reflect.Value) ([]reflect.Value, erro
 // CallInjected call the given method, injecting its arguments.
 func (self *Container) CallInjected(method any) error {
 
+	// input checks
+
 	methodValue := reflect.ValueOf(method)
 
 	typ := methodValue.Type()
@@ -648,35 +654,37 @@ func (self *Container) CallInjected(method any) error {
 		}
 	}
 
+	// get life cycle aware instances and injected arguments
+
 	preCallAwared, err := self.getComponentInstances(preCallAwaredName)
 	if err != nil {
-		self.closeInstances([]*Instance{}, []*Instance{})
+		self.closeInstances()
 		return err
+	}
+	for _, awared := range preCallAwared {
+		e := awared.precall(methodValue)
+		if e != nil {
+			self.closeInstances()
+			return e
+		}
 	}
 
 	postInstAwared, err := self.getComponentInstances(postInstAwaredName)
 	if err != nil {
-		self.closeInstances([]*Instance{}, []*Instance{})
+		self.closeInstances()
 		return err
 	}
 
-	preCloseAwared, err := self.getComponentInstances(preCloseAwaredName)
+	self.preCloseAwared, err = self.getComponentInstances(preCloseAwaredName)
 	if err != nil {
-		self.closeInstances([]*Instance{}, []*Instance{})
+		self.closeInstances()
 		return err
 	}
 
-	postCloseAwared, err := self.getComponentInstances(postCloseAwaredName)
+	self.postCloseAwared, err = self.getComponentInstances(postCloseAwaredName)
 	if err != nil {
-		self.closeInstances(preCloseAwared, []*Instance{})
+		self.closeInstances()
 		return err
-	}
-
-	for _, awared := range preCallAwared {
-		e := awared.precall(methodValue)
-		if e != nil {
-			return e
-		}
 	}
 
 	args, err := self.getArguments(methodValue)
@@ -684,16 +692,30 @@ func (self *Container) CallInjected(method any) error {
 		return err
 	}
 
+	// release unused instances
+	self.instances = make(map[*Component]*Instance)
+	if len(self.testComponents) == 0 {
+		self.coreComponents = make(map[string][]*Component)
+	} else {
+		self.testComponents = make(map[string][]*Component)
+	}
+
+	// postinst
 	for _, awared := range postInstAwared {
 		e := awared.postinst(methodValue, args)
 		if e != nil {
+			self.closeInstances()
 			return e
 		}
 	}
 
+	// calling
 	outs := methodValue.Call(args)
 
-	self.closeInstances(preCloseAwared, postCloseAwared)
+	// close
+	self.closeInstances()
+
+	// output
 
 	if numOut == 1 {
 		if err := outs[0].Interface().(error); err != nil {
@@ -705,27 +727,18 @@ func (self *Container) CallInjected(method any) error {
 
 }
 
-func (self *Container) closeInstances(preCloseAwared []*Instance, postCloseAwared []*Instance) {
+func (self *Container) closeInstances() {
 
-	for _, awared := range preCloseAwared {
+	for _, awared := range self.preCloseAwared {
 		awared.preclose()
 	}
 
 	for _, instance := range self.closables {
 		instance.close(self)
-		delete(self.instances, instance.producer)
 	}
 
-	for _, awared := range postCloseAwared {
+	for _, awared := range self.postCloseAwared {
 		awared.postclose()
 	}
-
-}
-
-// ClearTests close all components and delete all registered Component for tests.
-func (self *Container) ClearTests() {
-
-	self.instances = make(map[*Component]*Instance)
-	self.testComponents = make(map[string][]*Component)
 
 }

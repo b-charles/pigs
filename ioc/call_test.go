@@ -174,10 +174,6 @@ var _ = Describe("IOC call", func() {
 
 			Expect(injectedA).To(Equal(&SimpleStruct{"TEST"}))
 
-			// restore
-
-			container.ClearTests()
-
 			// core
 
 			Expect(container.CallInjected(func(injected struct {

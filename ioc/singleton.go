@@ -54,7 +54,3 @@ func CallInjected(method any) {
 func UnsureCallInjected(method any) error {
 	return ContainerInstance().CallInjected(method)
 }
-
-func ClearTests() {
-	ContainerInstance().ClearTests()
-}
