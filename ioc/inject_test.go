@@ -20,7 +20,7 @@ var _ = Describe("IOC factory", func() {
 
 		It("should create a component without dependency", func() {
 
-			container.Put(&SimpleStruct{"A"})
+			Expect(container.Put(&SimpleStruct{"A"})).Should(BeNil())
 
 			var injectedA *SimpleStruct
 
@@ -36,29 +36,8 @@ var _ = Describe("IOC factory", func() {
 
 		It("should create a component with dependency", func() {
 
-			container.PutNamedFactory(SimpleStructFactory("A"), "A")
-			container.Put(&InjectedObject{})
-
-			var injectedB *InjectedObject
-
-			Expect(container.CallInjected(func(injected struct {
-				B *InjectedObject
-			}) {
-				injectedB = injected.B
-			})).Should(Succeed())
-
-			Expect(injectedB).To(Equal(&InjectedObject{&SimpleStruct{"A"}}))
-
-		})
-
-		It("should select not nil component", func() {
-
-			container.PutNamedFactory(func() *SimpleStruct {
-				return nil
-			}, "NIL", "A")
-
-			container.PutNamedFactory(SimpleStructFactory("A"), "A")
-			container.Put(&InjectedObject{})
+			Expect(container.PutNamedFactory(SimpleStructFactory("A"), "A")).Should(BeNil())
+			Expect(container.Put(&InjectedObject{})).Should(BeNil())
 
 			var injectedB *InjectedObject
 
@@ -74,10 +53,10 @@ var _ = Describe("IOC factory", func() {
 
 		It("should inject test component if provided", func() {
 
-			container.PutNamedFactory(SimpleStructFactory("A"), "A")
-			container.TestPutNamedFactory(SimpleStructFactory("TEST"), "TEST", "A")
+			Expect(container.PutNamedFactory(SimpleStructFactory("A"), "A")).Should(BeNil())
+			Expect(container.TestPutNamedFactory(SimpleStructFactory("TEST"), "TEST", "A")).Should(BeNil())
 
-			container.Put(&InjectedObject{})
+			Expect(container.Put(&InjectedObject{})).Should(BeNil())
 
 			var injectedB *InjectedObject
 
@@ -93,7 +72,7 @@ var _ = Describe("IOC factory", func() {
 
 		It("should return an error if no component is provided", func() {
 
-			container.Put(&InjectedObject{})
+			Expect(container.Put(&InjectedObject{})).Should(BeNil())
 
 			var injectedB *InjectedObject
 
@@ -108,10 +87,10 @@ var _ = Describe("IOC factory", func() {
 
 		It("should return an error if too many components are provided", func() {
 
-			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")
-			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")
+			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")).Should(BeNil())
+			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")).Should(BeNil())
 
-			container.Put(&InjectedObject{})
+			Expect(container.Put(&InjectedObject{})).Should(BeNil())
 
 			var injectedB *InjectedObject
 
@@ -126,8 +105,8 @@ var _ = Describe("IOC factory", func() {
 
 		It("should inject an interface by field name", func() {
 
-			container.PutNamedFactory(SimpleStructFactory("A"), "A")
-			container.Put(&InterfaceInjectedObject{})
+			Expect(container.PutNamedFactory(SimpleStructFactory("A"), "A")).Should(BeNil())
+			Expect(container.Put(&InterfaceInjectedObject{})).Should(BeNil())
 
 			var injectedB *InterfaceInjectedObject
 
@@ -143,8 +122,8 @@ var _ = Describe("IOC factory", func() {
 
 		It("should inject an interface by tag name", func() {
 
-			container.PutNamedFactory(SimpleStructFactory("A"), "A")
-			container.Put(&NamedInterfaceInjectedObject{})
+			Expect(container.PutNamedFactory(SimpleStructFactory("A"), "A")).Should(BeNil())
+			Expect(container.Put(&NamedInterfaceInjectedObject{})).Should(BeNil())
 
 			var injectedB *NamedInterfaceInjectedObject
 
@@ -160,7 +139,7 @@ var _ = Describe("IOC factory", func() {
 
 		It("should inject the component in itself", func() {
 
-			container.Put(&Looping{})
+			Expect(container.Put(&Looping{})).Should(BeNil())
 
 			var injectedLooping *Looping
 
@@ -180,11 +159,11 @@ var _ = Describe("IOC factory", func() {
 
 		It("should create a component with a slice of dependencies", func() {
 
-			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")
-			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")
-			container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")
+			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")).Should(BeNil())
+			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")).Should(BeNil())
+			Expect(container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")).Should(BeNil())
 
-			container.Put(&SliceInjectedObject{})
+			Expect(container.Put(&SliceInjectedObject{})).Should(BeNil())
 
 			var injectedB *SliceInjectedObject
 
@@ -203,15 +182,15 @@ var _ = Describe("IOC factory", func() {
 
 		It("should inject a slice without nil components", func() {
 
-			container.PutNamedFactory(func() *SimpleStruct {
+			Expect(container.PutNamedFactory(func() *SimpleStruct {
 				return nil
-			}, "NIL", "A")
+			}, "NIL", "A")).Should(BeNil())
 
-			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")
-			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")
-			container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")
+			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")).Should(BeNil())
+			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")).Should(BeNil())
+			Expect(container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")).Should(BeNil())
 
-			container.Put(&SliceInjectedObject{})
+			Expect(container.Put(&SliceInjectedObject{})).Should(BeNil())
 
 			var injectedB *SliceInjectedObject
 
@@ -230,11 +209,11 @@ var _ = Describe("IOC factory", func() {
 
 		It("should inject a slice of interface", func() {
 
-			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "Doers")
-			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "Doers")
-			container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "Doers")
+			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "Doers")).Should(BeNil())
+			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "Doers")).Should(BeNil())
+			Expect(container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "Doers")).Should(BeNil())
 
-			container.Put(&InterfaceSliceInjectedObject{})
+			Expect(container.Put(&InterfaceSliceInjectedObject{})).Should(BeNil())
 
 			var injectedB *InterfaceSliceInjectedObject
 
@@ -257,11 +236,11 @@ var _ = Describe("IOC factory", func() {
 
 		It("should inject a map", func() {
 
-			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")
-			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")
-			container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")
+			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")).Should(BeNil())
+			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")).Should(BeNil())
+			Expect(container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")).Should(BeNil())
 
-			container.Put(&MapInjectedObject{})
+			Expect(container.Put(&MapInjectedObject{})).Should(BeNil())
 
 			var injectedB *MapInjectedObject
 
@@ -280,15 +259,15 @@ var _ = Describe("IOC factory", func() {
 
 		It("should inject a map without nil components", func() {
 
-			container.PutNamedFactory(func() *SimpleStruct {
+			Expect(container.PutNamedFactory(func() *SimpleStruct {
 				return nil
-			}, "NIL", "A")
+			}, "NIL", "A")).Should(BeNil())
 
-			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")
-			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")
-			container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")
+			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")).Should(BeNil())
+			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")).Should(BeNil())
+			Expect(container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")).Should(BeNil())
 
-			container.Put(&MapInjectedObject{})
+			Expect(container.Put(&MapInjectedObject{})).Should(BeNil())
 
 			var injectedB *MapInjectedObject
 
@@ -307,11 +286,11 @@ var _ = Describe("IOC factory", func() {
 
 		It("should inject a map of interface", func() {
 
-			container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "Doers")
-			container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "Doers")
-			container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "Doers")
+			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "Doers")).Should(BeNil())
+			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "Doers")).Should(BeNil())
+			Expect(container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "Doers")).Should(BeNil())
 
-			container.Put(&InterfaceMapInjectedObject{})
+			Expect(container.Put(&InterfaceMapInjectedObject{})).Should(BeNil())
 
 			var injectedB *InterfaceMapInjectedObject
 

@@ -16,26 +16,26 @@ var postCloseAwaredName = unsafeDefaultAlias(func(PostCloseAwared) {})
 // CONTAINER
 
 type Container struct {
-	coreComponents  map[string][]*Component
-	testComponents  map[string][]*Component
+	coreComponents  map[string][]*component
+	testComponents  map[string][]*component
 	creationTime    time.Time
-	instances       map[*Component]*Instance
-	preCloseAwared  []*Instance
-	postCloseAwared []*Instance
-	closables       []*Instance
+	instances       map[*component]*instance
+	preCloseAwared  []*instance
+	postCloseAwared []*instance
+	closables       []*instance
 }
 
 // NewContainer creates a pointer to a new initialized Container.
 func NewContainer() *Container {
 
 	container := &Container{
-		coreComponents:  make(map[string][]*Component),
-		testComponents:  make(map[string][]*Component),
+		coreComponents:  make(map[string][]*component),
+		testComponents:  make(map[string][]*component),
 		creationTime:    time.Now(),
-		instances:       map[*Component]*Instance{},
-		preCloseAwared:  []*Instance{},
-		postCloseAwared: []*Instance{},
-		closables:       []*Instance{}}
+		instances:       map[*component]*instance{},
+		preCloseAwared:  []*instance{},
+		postCloseAwared: []*instance{},
+		closables:       []*instance{}}
 
 	container.Put(container)
 
@@ -53,120 +53,38 @@ func (self *Container) CreationTime() time.Time {
 	return self.creationTime
 }
 
-// DEFAULT NAMING
-
-// defaultName returns the default name of a component type.
-func defaultComponentName(typ reflect.Type) string {
-
-	if typ.Kind() == reflect.Pointer || typ.Kind() == reflect.Slice ||
-		(typ.Kind() == reflect.Map && typ.Key() == string_type) {
-		typ = typ.Elem()
-	}
-
-	name := typ.Name()
-	if name == "" {
-		return typ.String()
-	}
-
-	pkg := typ.PkgPath()
-	if pkg == "" {
-		return name
-	}
-
-	return fmt.Sprintf("%s/%s", pkg, name)
-
-}
-
-// defaultName returns the default name of a component type.
-func defaultFactoryName(typ reflect.Type) (string, error) {
-
-	if typ.Kind() != reflect.Func {
-		return "", fmt.Errorf("The type %v should be a function.", typ)
-	}
-
-	o := typ.NumOut()
-	if o == 0 {
-		return "", fmt.Errorf("The function should return at least one value.")
-	}
-
-	return defaultComponentName(typ.Out(0)), nil
-
-}
-
-// defaultAlias returns the aliases of the given argument.
-func defaultAlias(alias any) ([]string, error) {
-
-	value := reflect.ValueOf(alias)
-	typ := value.Type()
-
-	if typ == string_type {
-		return []string{value.String()}, nil
-	}
-
-	if typ.Kind() == reflect.Func {
-		list := make([]string, 0)
-		for i := 0; i < typ.NumIn(); i++ {
-			list = append(list, defaultComponentName(typ.In(i)))
-		}
-		return list, nil
-	}
-
-	return nil, fmt.Errorf("Can not guess aliases of '%v'", alias)
-
-}
-
-// unsafeDefaultAlias returns the first alias, and panics in case of error.
-func unsafeDefaultAlias(alias any) string {
-	aliases, err := defaultAlias(alias)
-	if err != nil {
-		panic(err)
-	}
-	return aliases[0]
-}
-
-// defaultAliases returns the aliases of given arguments.
-func defaultAliases(aliases ...any) ([]string, error) {
-
-	list := make([]string, 0)
-
-	for _, elt := range aliases {
-
-		l, err := defaultAlias(elt)
-		if err != nil {
-			return nil, err
-		}
-
-		list = append(list, l...)
-
-	}
-
-	return list, nil
-
-}
-
 // REGISTRATION
 
-// putIn creates a Component (by its factory, name and aliases) and put it in
+// putIn creates a component (by its factory, name and aliases) and put it in
 // the given map.
-func putIn(
-	factory any,
-	name string,
-	aliases []string,
-	components map[string][]*Component) error {
+func (self *Container) putIn(factory any, name string, aliases []string, core bool) error {
 
-	component, err := NewComponent(factory, name, aliases)
-	if err != nil {
-		return err
+	var sink map[string][]*component
+	if core {
+		sink = self.coreComponents
+	} else {
+		sink = self.testComponents
 	}
 
-	for _, alias := range component.aliases {
+	if old, present := sink[name]; present {
+		return fmt.Errorf("Two components '%v' and '%v' are registered with the same main name '%s'.", old, factory, name)
+	}
 
-		list, ok := components[alias]
+	comp, err := newComponent(self, factory, name, aliases)
+	if err != nil {
+		return fmt.Errorf("Error during registration of '%s': %w", name, err)
+	}
+
+	sink[name] = []*component{comp}
+
+	for _, alias := range comp.aliases {
+
+		list, ok := sink[alias]
 		if !ok {
-			list = make([]*Component, 0)
+			list = make([]*component, 0)
 		}
 
-		components[alias] = append(list, component)
+		sink[alias] = append(list, comp)
 
 	}
 
@@ -174,14 +92,14 @@ func putIn(
 
 }
 
-// wrap converts a component into a function which returns this component.
+// wrap converts a component into a factory which returns this component.
 func wrap[T any](component T) func() T {
 	return func() T {
 		return component
 	}
 }
 
-// PutNamedFactory records a new Component by its factory and its name.
+// PutNamedFactory records a new component by its factory and its name.
 func (self *Container) PutNamedFactory(factory any, name string, aliases ...any) error {
 
 	allAliases, err := defaultAliases(aliases...)
@@ -189,11 +107,11 @@ func (self *Container) PutNamedFactory(factory any, name string, aliases ...any)
 		return fmt.Errorf("Can not register factory '%v': %w", name, err)
 	}
 
-	return putIn(factory, name, allAliases, self.coreComponents)
+	return self.putIn(factory, name, allAliases, true)
 
 }
 
-// PutNamed records a new Component by its value and its name.
+// PutNamed records a new component by its value and its name.
 func (self *Container) PutNamed(component any, name string, aliases ...any) error {
 
 	allAliases, err := defaultAliases(aliases...)
@@ -201,11 +119,11 @@ func (self *Container) PutNamed(component any, name string, aliases ...any) erro
 		return fmt.Errorf("Can not register component '%v': %w", name, err)
 	}
 
-	return putIn(wrap(component), name, allAliases, self.coreComponents)
+	return self.putIn(wrap(component), name, allAliases, true)
 
 }
 
-// PutFactory records a new Component by its factory.
+// PutFactory records a new component by its factory.
 func (self *Container) PutFactory(factory any, aliases ...any) error {
 
 	name, err := defaultFactoryName(reflect.TypeOf(factory))
@@ -218,11 +136,11 @@ func (self *Container) PutFactory(factory any, aliases ...any) error {
 		return fmt.Errorf("Can not register factory '%v': %w", name, err)
 	}
 
-	return putIn(factory, name, allAliases, self.coreComponents)
+	return self.putIn(factory, name, allAliases, true)
 
 }
 
-// Put records a new Component by its value.
+// Put records a new component by its value.
 func (self *Container) Put(component any, aliases ...any) error {
 
 	name := defaultComponentName(reflect.TypeOf(component))
@@ -232,11 +150,11 @@ func (self *Container) Put(component any, aliases ...any) error {
 		return fmt.Errorf("Can not register component '%v': %w", name, err)
 	}
 
-	return putIn(wrap(component), name, allAliases, self.coreComponents)
+	return self.putIn(wrap(component), name, allAliases, true)
 
 }
 
-// TestPutNamedFactory records a new Component for tests by its factory and its name.
+// TestPutNamedFactory records a new component for tests by its factory and its name.
 func (self *Container) TestPutNamedFactory(factory any, name string, aliases ...any) error {
 
 	allAliases, err := defaultAliases(aliases...)
@@ -244,11 +162,11 @@ func (self *Container) TestPutNamedFactory(factory any, name string, aliases ...
 		return fmt.Errorf("Can not register test factory '%v': %w", name, err)
 	}
 
-	return putIn(factory, name, allAliases, self.testComponents)
+	return self.putIn(factory, name, allAliases, false)
 
 }
 
-// TestNamedPut records a new Component for tests by its value and its name.
+// TestNamedPut records a new component for tests by its value and its name.
 func (self *Container) TestPutNamed(component any, name string, aliases ...any) error {
 
 	allAliases, err := defaultAliases(aliases...)
@@ -256,11 +174,11 @@ func (self *Container) TestPutNamed(component any, name string, aliases ...any) 
 		return fmt.Errorf("Can not register test component '%v': %w", name, err)
 	}
 
-	return putIn(wrap(component), name, allAliases, self.testComponents)
+	return self.putIn(wrap(component), name, allAliases, false)
 
 }
 
-// TestPutFactory records a new Component for tests by its factory.
+// TestPutFactory records a new component for tests by its factory.
 func (self *Container) TestPutFactory(factory any, aliases ...any) error {
 
 	name, err := defaultFactoryName(reflect.TypeOf(factory))
@@ -273,11 +191,11 @@ func (self *Container) TestPutFactory(factory any, aliases ...any) error {
 		return fmt.Errorf("Can not register test factory '%v': %w", name, err)
 	}
 
-	return putIn(factory, name, allAliases, self.testComponents)
+	return self.putIn(factory, name, allAliases, false)
 
 }
 
-// TestPut records a new Component for tests by its value.
+// TestPut records a new component for tests by its value.
 func (self *Container) TestPut(component any, aliases ...any) error {
 
 	name := defaultComponentName(reflect.TypeOf(component))
@@ -287,7 +205,7 @@ func (self *Container) TestPut(component any, aliases ...any) error {
 		return fmt.Errorf("Can not register test component '%v': %w", name, err)
 	}
 
-	return putIn(wrap(component), name, allAliases, self.testComponents)
+	return self.putIn(wrap(component), name, allAliases, false)
 
 }
 
@@ -296,23 +214,23 @@ func (self *Container) TestPut(component any, aliases ...any) error {
 // getComponentInstance gets the instance of the given component. If the
 // instance is already created, the instance is returned. If not, the instance is
 // created, recorded, initialized, post-initialized and returned.
-func (self *Container) getComponentInstance(component *Component) (*Instance, error) {
+func (self *Container) getComponentInstance(component *component) (*instance, error) {
 
 	if instance, ok := self.instances[component]; ok {
 		return instance, nil
 	}
 
-	instance, err := component.instanciate(self)
+	instance, err := component.instanciate()
 	if err != nil {
 		return instance, err
 	}
 
 	self.instances[component] = instance
 
-	if err := instance.initialize(self); err != nil {
+	if err := instance.initialize(); err != nil {
 		return instance, err
 	}
-	if err := instance.postInit(self); err != nil {
+	if err := instance.postInit(); err != nil {
 		return instance, err
 	}
 
@@ -325,14 +243,14 @@ func (self *Container) getComponentInstance(component *Component) (*Instance, er
 }
 
 // extractInstances get not nil instances from a name and a map of Components.
-func (self *Container) extractInstances(name string, components map[string][]*Component) ([]*Instance, error) {
+func (self *Container) extractInstances(name string, components map[string][]*component) ([]*instance, error) {
 
 	list, ok := components[name]
 	if !ok {
-		return []*Instance{}, nil
+		return []*instance{}, nil
 	}
 
-	instances := make([]*Instance, 0, len(list))
+	instances := make([]*instance, 0, len(list))
 
 	for _, component := range list {
 
@@ -351,9 +269,9 @@ func (self *Container) extractInstances(name string, components map[string][]*Co
 
 }
 
-// getComponentInstances get the instance from the test map Component, or the
+// getComponentInstances get the instance from the test map component, or the
 // core map if nothing is found.
-func (self *Container) getComponentInstances(name string) ([]*Instance, error) {
+func (self *Container) getComponentInstances(name string) ([]*instance, error) {
 
 	instances, err := self.extractInstances(name, self.testComponents)
 	if err != nil || len(instances) > 0 {
@@ -367,10 +285,10 @@ func (self *Container) getComponentInstances(name string) ([]*Instance, error) {
 // INJECTION
 
 var string_type reflect.Type = reflect.TypeOf("")
-var error_type = reflect.TypeOf(fmt.Errorf(""))
+var error_type = reflect.TypeOf(func(error) {}).In(0)
 
 // packInstance converts one instance to target type (direct, ptr or addr).
-func packInstance(instance *Instance, target reflect.Type) (reflect.Value, error) {
+func packInstance(instance *instance, target reflect.Type) (reflect.Value, error) {
 
 	value := instance.value
 	typ := value.Type()
@@ -392,7 +310,7 @@ func packInstance(instance *Instance, target reflect.Type) (reflect.Value, error
 }
 
 // pack converts instance slice (not empty) to target type (direct, ptr, addr, slice or map).
-func packInstances(instances []*Instance, target reflect.Type) (reflect.Value, error) {
+func packInstances(instances []*instance, target reflect.Type) (reflect.Value, error) {
 
 	if len(instances) == 0 {
 		return reflect.Value{}, fmt.Errorf("No component found.")
@@ -444,7 +362,7 @@ func packInstances(instances []*Instance, target reflect.Type) (reflect.Value, e
 
 	if len(instances) > 1 {
 
-		producers := make([]*Component, 0)
+		producers := make([]*component, 0)
 		for _, instance := range instances {
 			producers = append(producers, instance.producer)
 		}
@@ -486,7 +404,7 @@ func (self *Container) inject(value reflect.Value, onlyTagged bool) error {
 			return fmt.Errorf("The field '%v' of %v is not settable.", nameField, typ)
 		}
 
-		var instances []*Instance
+		var instances []*instance
 		var err error
 
 		if name != "" {
@@ -621,6 +539,7 @@ func (self *Container) getArguments(method reflect.Value) ([]reflect.Value, erro
 
 }
 
+// callInjected call the given method, injecting its arguments.
 func (self *Container) callInjected(method reflect.Value) ([]reflect.Value, error) {
 
 	args, err := self.getArguments(method)
@@ -634,7 +553,7 @@ func (self *Container) callInjected(method reflect.Value) ([]reflect.Value, erro
 
 // EXTERNAL RESOLUTION
 
-// CallInjected call the given method, injecting its arguments.
+// callEntryPoint call the given method, injecting its arguments.
 func (self *Container) CallInjected(method any) error {
 
 	// input checks
@@ -693,11 +612,11 @@ func (self *Container) CallInjected(method any) error {
 	}
 
 	// release unused instances
-	self.instances = make(map[*Component]*Instance)
+	self.instances = make(map[*component]*instance)
 	if len(self.testComponents) == 0 {
-		self.coreComponents = make(map[string][]*Component)
+		self.coreComponents = make(map[string][]*component)
 	} else {
-		self.testComponents = make(map[string][]*Component)
+		self.testComponents = make(map[string][]*component)
 	}
 
 	// postinst
@@ -734,7 +653,7 @@ func (self *Container) closeInstances() {
 	}
 
 	for _, instance := range self.closables {
-		instance.close(self)
+		instance.close()
 	}
 
 	for _, awared := range self.postCloseAwared {

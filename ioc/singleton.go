@@ -1,15 +1,17 @@
 package ioc
 
-import "sync"
+import (
+	"sync"
+)
 
-var instance *Container
+var containerInstance *Container
 var once sync.Once
 
 func ContainerInstance() *Container {
 	once.Do(func() {
-		instance = NewContainer()
+		containerInstance = NewContainer()
 	})
-	return instance
+	return containerInstance
 }
 
 func ErroneousPutNamedFactory(factory any, name string, aliases ...any) error {

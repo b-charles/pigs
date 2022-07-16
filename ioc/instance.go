@@ -6,25 +6,19 @@ import (
 	"reflect"
 )
 
-// instance represents a Component instance. It's created by the factory of the
-// Component.
-type Instance struct {
+// instance represents a component instance. It's created by the factory of the
+// component.
+type instance struct {
+	producer *component
 	value    reflect.Value
-	producer *Component
-}
-
-// voidInstance creates an instance without value.
-func voidInstance(producer *Component) *Instance {
-	return &Instance{reflect.Value{}, producer}
-}
-
-// newInstance creates a new instance.
-func newInstance(instance reflect.Value, producer *Component) *Instance {
-	return &Instance{instance, producer}
 }
 
 // isNil returns whether the value is nil or not.
-func (self *Instance) isNil() bool {
+func (self *instance) isNil() bool {
+
+	if self == nil {
+		return true
+	}
 
 	if !self.value.IsValid() {
 		return true
@@ -46,20 +40,23 @@ func (self *Instance) isNil() bool {
 
 // initialize initializes the instance: if the instance is a struct or a
 // pointer to a struct, each field is injected.
-func (self *Instance) initialize(container *Container) error {
+func (self *instance) initialize() error {
 
-	if err := container.inject(self.value, true); err != nil {
+	if self == nil {
+		return nil
+	} else if err := self.producer.container.inject(self.value, true); err != nil {
 		return fmt.Errorf("Error during initialisation of '%v': %w", self.producer, err)
+	} else {
+		return nil
 	}
-	return nil
 
 }
 
 // postInit call the PostInit method (if defined).
-func (self *Instance) postInit(container *Container) error {
+func (self *instance) postInit() error {
 
-	wrap := func(err error) error {
-		return fmt.Errorf("Error during post-initialization of '%v': %w", self.producer, err)
+	if self == nil {
+		return nil
 	}
 
 	method := self.value.MethodByName("PostInit")
@@ -67,100 +64,119 @@ func (self *Instance) postInit(container *Container) error {
 		return nil
 	}
 
-	out, err := container.callInjected(method)
-	if err != nil {
-		return wrap(err)
+	wrap := func(err error) error {
+		return fmt.Errorf("Error during post-initialization of '%v': %w", self.producer, err)
 	}
 
-	if len(out) == 1 {
+	if out, err := self.producer.container.callInjected(method); err != nil {
+
+		return wrap(err)
+
+	} else if len(out) > 1 {
+
+		return wrap(fmt.Errorf("The post-init method should return none or one output, not %d.", len(out)))
+
+	} else if len(out) == 1 {
+
 		if err, ok := out[0].Interface().(error); !ok {
 			return wrap(fmt.Errorf("The output of the post-init method should be an error, not a '%v'.", out[0].Type()))
 		} else if err != nil {
 			return wrap(err)
+		} else {
+			return nil
 		}
-	}
 
-	if len(out) > 1 {
-		return wrap(fmt.Errorf("The post-init method should return none or one output, not %d.", len(out)))
-	}
+	} else {
 
-	return nil
+		return nil
+
+	}
 
 }
 
 // precall call the precall method (panics if not defined).
-func (self *Instance) precall(method reflect.Value) error {
+func (self *instance) precall(method reflect.Value) error {
 
-	awared, ok := self.value.Interface().(PreCallAwared)
-	if !ok {
+	if self == nil {
+		return nil
+	} else if awared, ok := self.value.Interface().(PreCallAwared); !ok {
 		panic(fmt.Sprintf("The component '%v' (%v) should be a PreCallAwared.", self, self.value.Type()))
-	}
-
-	err := awared.Precall(method)
-	if err != nil {
+	} else if err := awared.Precall(method); err != nil {
 		return fmt.Errorf("Error during call of precall of '%v': %w", self, err)
+	} else {
+		return nil
 	}
-	return nil
 
 }
 
 // postinst call the postinst method (panics if not defined).
-func (self *Instance) postinst(method reflect.Value, args []reflect.Value) error {
+func (self *instance) postinst(method reflect.Value, args []reflect.Value) error {
 
-	awared, ok := self.value.Interface().(PostInstAwared)
-	if !ok {
+	if self == nil {
+		return nil
+	} else if awared, ok := self.value.Interface().(PostInstAwared); !ok {
 		panic(fmt.Sprintf("The component '%v' should be a PostInstAwared.", self))
-	}
-
-	err := awared.Postinst(method, args)
-	if err != nil {
+	} else if err := awared.Postinst(method, args); err != nil {
 		return fmt.Errorf("Error during call of postinst of '%v': %w", self, err)
+	} else {
+		return nil
 	}
-	return nil
 
 }
 
 // preclose close the preclose method (panics if not defined).
-func (self *Instance) preclose() {
+func (self *instance) preclose() {
 
-	awared, ok := self.value.Interface().(PreCloseAwared)
-	if !ok {
+	if self == nil {
+		return
+	} else if awared, ok := self.value.Interface().(PreCloseAwared); !ok {
 		panic(fmt.Sprintf("The component '%v' should be a PreCloseAwared.", self))
+	} else {
+
+		defer func() {
+			_ = recover()
+		}()
+
+		awared.Preclose()
+
 	}
-
-	defer func() {
-		_ = recover()
-	}()
-
-	awared.Preclose()
 
 }
 
 // postclose close the postclose method (panics if not defined).
-func (self *Instance) postclose() {
+func (self *instance) postclose() {
 
-	awared, ok := self.value.Interface().(PostCloseAwared)
-	if !ok {
+	if self == nil {
+		return
+	} else if awared, ok := self.value.Interface().(PostCloseAwared); !ok {
 		panic(fmt.Sprintf("The component '%v' should be a PostCloseAwared.", self))
+	} else {
+
+		defer func() {
+			_ = recover()
+		}()
+
+		awared.Postclose()
+
 	}
-
-	defer func() {
-		_ = recover()
-	}()
-
-	awared.Postclose()
 
 }
 
-func (self *Instance) isClosable() bool {
-	_, closable := self.value.Interface().(io.Closer)
-	return closable
+func (self *instance) isClosable() bool {
+	if self == nil {
+		return false
+	} else {
+		_, closable := self.value.Interface().(io.Closer)
+		return closable
+	}
 }
 
 // close call the Close method (if defined).
-func (self *Instance) close(container *Container) {
+func (self *instance) close() {
 
-	if closer, ok := self.value.Interface().(io.Closer); ok {
+	if self == nil {
+		return
+	} else if closer, ok := self.value.Interface().(io.Closer); ok {
 
 		defer func() {
 			_ = recover()
@@ -172,6 +188,10 @@ func (self *Instance) close(container *Container) {
 
 }
 
-func (self *Instance) String() string {
-	return self.producer.name
+func (self *instance) String() string {
+	if self == nil {
+		return "nil"
+	} else {
+		return self.producer.name
+	}
 }

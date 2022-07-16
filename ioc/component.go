@@ -5,76 +5,76 @@ import (
 	"reflect"
 )
 
-type Component struct {
-	name    string
-	aliases []string
-	factory reflect.Value
+type component struct {
+	container *Container
+	name      string
+	aliases   []string
+	factory   reflect.Value
 }
 
-func NewComponent(factory interface{}, name string, aliases []string) (*Component, error) {
+func newComponent(container *Container, factory any, name string, aliases []string) (*component, error) {
 
-	wrap := func(err error) error {
-		return fmt.Errorf("Error during registration of '%s': %w", name, err)
-	}
-
-	// get unique aliases
+	// check aliases uniqueness
 
 	uniqueAliases := make(map[string]bool)
 	uniqueAliases[name] = true
 	for _, alias := range aliases {
 		if _, ok := uniqueAliases[alias]; ok {
-			return nil, wrap(fmt.Errorf("Alias specified more than once: '%s'.", alias))
+			return nil, fmt.Errorf("Alias specified more than once: '%s'.", alias)
 		}
 		uniqueAliases[alias] = true
 	}
 
-	allAliases := make([]string, 0, len(uniqueAliases))
-	for alias := range uniqueAliases {
-		allAliases = append(allAliases, alias)
+	// check factory signature
+
+	factoryValue := reflect.ValueOf(factory)
+	factoryType := reflect.TypeOf(factory)
+
+	if factoryType.Kind() != reflect.Func {
+		return nil, fmt.Errorf("The factory should be a function, but was %v.", factoryType)
+	}
+
+	if nout := factoryType.NumOut(); nout == 0 {
+		return nil, fmt.Errorf("The factory should return at least one output.")
+	} else if nout == 2 && !factoryType.Out(1).AssignableTo(error_type) {
+		return nil, fmt.Errorf("The second output of the factory should be an %v, not '%v'.", error_type, factoryType.Out(1))
+	} else if nout > 2 {
+		return nil, fmt.Errorf("The factory should return one or two output, not %d.", nout)
 	}
 
 	// return
-
-	return &Component{name, allAliases, reflect.ValueOf(factory)}, nil
+	return &component{container, name, aliases, factoryValue}, nil
 
 }
 
-func (self *Component) instanciate(container *Container) (*Instance, error) {
+func (self *component) instanciate() (*instance, error) {
 
-	wrap := func(err error) (*Instance, error) {
-		return voidInstance(self), fmt.Errorf("Error during instanciation of '%s': %w", self.name, err)
+	if self == nil {
+		return nil, nil
 	}
 
-	out, err := container.callInjected(self.factory)
+	outs, err := self.container.callInjected(self.factory)
 	if err != nil {
-		return wrap(err)
-	}
-
-	if len(out) == 0 {
-		return wrap(fmt.Errorf("The factory should return at least one output."))
-	}
-
-	if len(out) == 2 {
-		if err, ok := out[1].Interface().(error); !ok {
-			return wrap(fmt.Errorf("The second output of the factory should be an error, not a '%v'.", out[1].Type()))
-		} else if err != nil {
-			return wrap(err)
+		return nil, fmt.Errorf("Error during call of factory of '%s': %w", self.name, err)
+	} else if len(outs) == 2 {
+		if err := outs[1].Interface().(error); err != nil {
+			return nil, fmt.Errorf("Error during instanciation of '%s': %w", self.name, err)
 		}
 	}
 
-	if len(out) > 2 {
-		return wrap(fmt.Errorf("The factory should return one or two output, not %d.", len(out)))
-	}
-
-	obj := out[0]
+	obj := outs[0]
 	if obj.Kind() == reflect.Interface {
 		obj = obj.Elem()
 	}
 
-	return newInstance(obj, self), nil
+	return &instance{self, obj}, nil
 
 }
 
-func (self *Component) String() string {
-	return self.name
+func (self *component) String() string {
+	if self == nil {
+		return "nil"
+	} else {
+		return self.name
+	}
 }
