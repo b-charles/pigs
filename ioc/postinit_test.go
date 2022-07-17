@@ -8,9 +8,7 @@ import (
 
 var _ = Describe("IOC post-init and close", func() {
 
-	var (
-		container *Container
-	)
+	var container *Container
 
 	BeforeEach(func() {
 		container = NewContainer()
@@ -18,39 +16,33 @@ var _ = Describe("IOC post-init and close", func() {
 
 	It("should call PostInit in the correct order", func() {
 
-		container.PutFactory(NewOrderRegster, "OrderRegister")
-		container.Put(&First{}, "First")
-		container.Put(&Second{}, "Second")
-		container.Put(&Third{}, "Third")
+		container.PutFactory(NewOrderRegister)
+		container.Put(&First{})
+		container.Put(&Second{})
+		container.Put(&Third{})
 
-		var injectedThird *Third
+		var third *Third
+		Expect(container.CallInjected(func(injected *Third) {
+			third = injected
+		})).To(Succeed())
 
-		Expect(container.CallInjected(func(injected struct {
-			Third *Third
-		}) {
-			injectedThird = injected.Third
-		})).Should(Succeed())
-
-		Expect(injectedThird.OrderRegister.PostInitOrder).Should(Equal([]string{"FIRST", "SECOND", "THIRD"}))
+		Expect(third.Register.PostInitOrder).To(Equal([]string{"FIRST", "SECOND", "THIRD"}))
 
 	})
 
 	It("should call Close in the correct order", func() {
 
-		container.PutFactory(NewOrderRegster, "OrderRegister")
-		container.Put(&First{}, "First")
-		container.Put(&Second{}, "Second")
-		container.Put(&Third{}, "Third")
+		container.PutFactory(NewOrderRegister)
+		container.Put(&First{})
+		container.Put(&Second{})
+		container.Put(&Third{})
 
-		var injectedThird *Third
+		var third *Third
+		Expect(container.CallInjected(func(injected *Third) {
+			third = injected
+		})).To(Succeed())
 
-		Expect(container.CallInjected(func(injected struct {
-			Third *Third
-		}) {
-			injectedThird = injected.Third
-		})).Should(Succeed())
-
-		Expect(injectedThird.OrderRegister.CloseOrder).Should(Equal([]string{"FIRST", "SECOND", "THIRD"}))
+		Expect(third.Register.CloseOrder).To(Equal([]string{"FIRST", "SECOND", "THIRD"}))
 
 	})
 

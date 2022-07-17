@@ -4,9 +4,12 @@ import (
 	"sync"
 )
 
-var containerInstance *Container
-var once sync.Once
+var (
+	containerInstance *Container
+	once              sync.Once
+)
 
+// ContainerInstance returns a unique Container instance (singleton).
 func ContainerInstance() *Container {
 	once.Do(func() {
 		containerInstance = NewContainer()
@@ -14,98 +17,74 @@ func ContainerInstance() *Container {
 	return containerInstance
 }
 
-func ErroneousPutNamedFactory(factory any, name string, aliases ...any) error {
-	return ContainerInstance().PutNamedFactory(factory, name, aliases...)
+// ErroneousPutFactory records a component defined by a factory and optional
+// signatures and returns an error if something wrong happened.
+func ErroneousPutFactory(factory any, signFuncs ...any) error {
+	return ContainerInstance().PutFactory(factory, signFuncs...)
 }
 
-func ErroneousPutNamed(object any, name string, aliases ...any) error {
-	return ContainerInstance().PutNamed(object, name, aliases...)
+// ErroneousPut records directly a component with optional signatures and
+// returns an error if something wrong happened.
+func ErroneousPut(object any, signFuncs ...any) error {
+	return ContainerInstance().Put(object, signFuncs...)
 }
 
-func ErroneousPutFactory(factory any, aliases ...any) error {
-	return ContainerInstance().PutFactory(factory, aliases...)
+// ErroneousTestPutFactory records a test component defined by a factory and
+// optional signatures and returns an error if something wrong happened.
+func ErroneousTestPutFactory(factory any, signFuncs ...any) error {
+	return ContainerInstance().TestPutFactory(factory, signFuncs...)
 }
 
-func ErroneousPut(object any, aliases ...any) error {
-	return ContainerInstance().Put(object, aliases...)
+// ErroneousTestPut records directly a test component with optional signatures
+// and returns an error if something wrong happened.
+func ErroneousTestPut(object any, signFuncs ...any) error {
+	return ContainerInstance().TestPut(object, signFuncs...)
 }
 
-func ErroneousTestPutNamedFactory(factory any, name string, aliases ...any) error {
-	return ContainerInstance().TestPutNamedFactory(factory, name, aliases...)
-}
-
-func ErroneousTestPutNamed(object any, name string, aliases ...any) error {
-	return ContainerInstance().TestPutNamed(object, name, aliases...)
-}
-
-func ErroneousTestPutFactory(factory any, aliases ...any) error {
-	return ContainerInstance().TestPutFactory(factory, aliases...)
-}
-
-func ErroneousTestPut(object any, aliases ...any) error {
-	return ContainerInstance().TestPut(object, aliases...)
-}
-
+// ErroneousCallInjected call the given method, injecting its arguments and
+// returns an error if something wrong happened.
 func ErroneousCallInjected(method any) error {
 	return ContainerInstance().CallInjected(method)
 }
 
-func PutNamedFactory(factory any, name string, aliases ...any) {
-	err := ErroneousPutNamed(factory, name, aliases...)
+// PutFactory records a component defined by a factory and optional
+// signatures. Panics if something wrong happened.
+func PutFactory(factory any, signFuncs ...any) {
+	err := ErroneousPutFactory(factory, signFuncs...)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func PutNamed(object any, name string, aliases ...any) {
-	err := ErroneousPutNamed(object, name, aliases...)
+// Put records directly a component with optional signatures. Panics if
+// something wrong happened.
+func Put(object any, signFuncs ...any) {
+	err := ErroneousPut(object, signFuncs...)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func PutFactory(factory any, aliases ...any) {
-	err := ErroneousPutFactory(factory, aliases...)
+// TestPutFactory records a test component defined by a factory and optional
+// signatures. Panics if something wrong happened.
+func TestPutFactory(factory any, signFuncs ...any) {
+	err := ErroneousTestPutFactory(factory, signFuncs...)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func Put(object any, aliases ...any) {
-	err := ErroneousPut(object, aliases...)
+// TestPut records directly a test component with optional signatures. Panics
+// if something wrong happened.
+func TestPut(object any, signFuncs ...any) {
+	err := ErroneousTestPut(object, signFuncs...)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func TestPutNamedFactory(factory any, name string, aliases ...any) {
-	err := ErroneousTestPutNamedFactory(factory, name, aliases...)
-	if err != nil {
-		panic(err)
-	}
-}
-
-func TestPutNamed(object any, name string, aliases ...any) {
-	err := ErroneousTestPutNamed(object, name, aliases...)
-	if err != nil {
-		panic(err)
-	}
-}
-
-func TestPutFactory(factory any, aliases ...any) {
-	err := ErroneousTestPutFactory(factory, aliases...)
-	if err != nil {
-		panic(err)
-	}
-}
-
-func TestPut(object any, aliases ...any) {
-	err := ErroneousTestPut(object, aliases...)
-	if err != nil {
-		panic(err)
-	}
-}
-
+// CallInjected call the given method, injecting its arguments. Panics if
+// something wrong happened.
 func CallInjected(method any) {
 	err := ErroneousCallInjected(method)
 	if err != nil {

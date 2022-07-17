@@ -8,229 +8,155 @@ import (
 
 var _ = Describe("IOC call", func() {
 
-	var (
-		container *Container
-		err       error
-	)
+	var container *Container
 
 	BeforeEach(func() {
 		container = NewContainer()
+	})
+
+	It("should be able to call without injection", func() {
+
+		called := false
+		Expect(container.CallInjected(func() {
+			called = true
+		})).To(Succeed())
+		Expect(called).To(BeTrue())
+
 	})
 
 	Describe("with simple injection", func() {
 
 		It("should be able to inject itself", func() {
 
-			err = container.CallInjected(func(injected *Container) {
+			called := false
+			Expect(container.CallInjected(func(injected *Container) {
+				called = true
 				Expect(injected).To(Equal(container))
-			})
-			Expect(err).To(Succeed())
+			})).To(Succeed())
+			Expect(called).To(BeTrue())
 
 		})
 
-		It("should be able to inject itself with an injected struct (without name)", func() {
+		It("should inject a simple component", func() {
 
-			err = container.CallInjected(func(injected struct {
-				Container *Container
-			}) {
-				Expect(injected.Container).To(Equal(container))
-			})
-			Expect(err).To(Succeed())
+			container.PutFactory(SimpleFactory("A"))
 
-		})
-
-		It("should be able to inject itself with an injected struct (with name)", func() {
-
-			err = container.CallInjected(func(injected struct {
-				Container *Container `inject:"github.com/b-charles/pigs/ioc/Container"`
-			}) {
-				Expect(injected.Container).To(Equal(container))
-			})
-			Expect(err).To(Succeed())
+			called := false
+			Expect(container.CallInjected(func(a *Simple) {
+				called = true
+				Expect(a).To(Equal(&Simple{"A"}))
+			})).To(Succeed())
+			Expect(called).To(BeTrue())
 
 		})
 
-		It("should inject a simple component (direct)", func() {
+		It("should inject two simple components", func() {
 
-			err = container.PutFactory(SimpleStructFactory("A"))
-			Expect(err).To(Succeed())
+			container.PutFactory(SimpleFactory("A"))
+			container.PutFactory(TrivialFactory("B"))
 
-			err = container.CallInjected(func(a *SimpleStruct) {
-				Expect(a).To(Equal(&SimpleStruct{"A"}))
-			})
-			Expect(err).To(Succeed())
-
-		})
-
-		It("should inject a simple component (injected struct without name)", func() {
-
-			err = container.PutFactory(SimpleStructFactory("A"))
-			Expect(err).To(Succeed())
-
-			err = container.CallInjected(func(injected struct {
-				Simple *SimpleStruct
-			}) {
-				Expect(injected.Simple).To(Equal(&SimpleStruct{"A"}))
-			})
-			Expect(err).To(Succeed())
+			called := false
+			Expect(container.CallInjected(func(a *Simple, b Trivial) {
+				called = true
+				Expect(a).To(Equal(&Simple{"A"}))
+				Expect(b).To(Equal(Trivial("B")))
+			})).To(Succeed())
+			Expect(called).To(BeTrue())
 
 		})
 
-		It("should inject a simple component (injected struct with name)", func() {
+		It("should inject nil", func() {
 
-			err = container.PutFactory(SimpleStructFactory("A"))
-			Expect(err).To(Succeed())
+			container.PutFactory(func() *Simple { return nil })
 
-			err = container.CallInjected(func(injected struct {
-				Simple *SimpleStruct `inject:"github.com/b-charles/pigs/ioc_test/SimpleStruct"`
-			}) {
-				Expect(injected.Simple).To(Equal(&SimpleStruct{"A"}))
-			})
-			Expect(err).To(Succeed())
-
-		})
-
-		It("should inject a simple component (injected struct by field name)", func() {
-
-			err = container.PutNamedFactory(SimpleStructFactory("A"), "A")
-			Expect(err).To(Succeed())
-
-			err = container.CallInjected(func(injected struct {
-				A *SimpleStruct
-			}) {
-				Expect(injected.A).To(Equal(&SimpleStruct{"A"}))
-			})
-			Expect(err).To(Succeed())
-
-		})
-
-		It("should inject a simple deferenced component (direct)", func() {
-
-			err = container.PutFactory(SimpleStructFactory("A"))
-			Expect(err).To(Succeed())
-
-			err = container.CallInjected(func(a SimpleStruct) {
-				Expect(a).To(Equal(SimpleStruct{"A"}))
-			})
-			Expect(err).To(Succeed())
-
-		})
-
-		It("should inject a simple deferenced component (in a struct)", func() {
-
-			err = container.PutFactory(SimpleStructFactory("A"))
-			Expect(err).To(Succeed())
-
-			err = container.CallInjected(func(injected struct {
-				A SimpleStruct
-			}) {
-				Expect(injected.A).To(Equal(SimpleStruct{"A"}))
-			})
-			Expect(err).To(Succeed())
-
-		})
-
-		It("should select not nil component", func() {
-
-			err = container.PutNamedFactory(func() *SimpleStruct { return nil }, "NIL", func(SomethingDoer) {})
-			Expect(err).To(Succeed())
-
-			err = container.PutNamedFactory(SimpleStructFactory("A"), "NOT_NIL", func(SomethingDoer) {})
-			Expect(err).To(Succeed())
-
-			err = container.CallInjected(func(a SomethingDoer) {
-				Expect(a).To(Equal(&SimpleStruct{"A"}))
-			})
-			Expect(err).To(Succeed())
+			called := false
+			Expect(container.CallInjected(func(a *Simple) {
+				called = true
+				Expect(a).To(BeNil())
+			})).To(Succeed())
+			Expect(called).To(BeTrue())
 
 		})
 
 		It("should inject test component if provided", func() {
 
-			err = container.PutFactory(SimpleStructFactory("A"))
-			Expect(err).To(Succeed())
+			container.PutFactory(SimpleFactory("A"))
+			container.TestPutFactory(SimpleFactory("TEST"))
 
-			err = container.TestPutFactory(SimpleStructFactory("TEST"))
-			Expect(err).To(Succeed())
-
-			err = container.CallInjected(func(a *SimpleStruct) {
-				Expect(a).To(Equal(&SimpleStruct{"TEST"}))
-			})
-			Expect(err).To(Succeed())
+			called := false
+			Expect(container.CallInjected(func(a *Simple) {
+				called = true
+				Expect(a).To(Equal(&Simple{"TEST"}))
+			})).To(Succeed())
+			Expect(called).To(BeTrue())
 
 		})
 
 		It("should return an error if no component is provided", func() {
 
-			var injectedA *SimpleStruct
-
-			Expect(container.CallInjected(func(injected struct {
-				A *SimpleStruct
-			}) {
-				injectedA = injected.A
-				injectedA.doSomething()
+			Expect(container.CallInjected(func(a *Simple) {
 			})).To(HaveOccurred())
 
 		})
 
 		It("should return an error if too many components are provided", func() {
 
-			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")).To(Succeed())
+			container.PutFactory(SimpleFactory("A1"))
+			container.PutFactory(SimpleFactory("A2"))
 
-			var injectedA *SimpleStruct
-
-			Expect(container.CallInjected(func(injected struct {
-				A *SimpleStruct
-			}) {
-				injectedA = injected.A
-				injectedA.doSomething()
+			Expect(container.CallInjected(func(a *Simple) {
 			})).To(HaveOccurred())
 
 		})
 
 		It("should inject an interface", func() {
 
-			Expect(container.PutNamedFactory(SimpleStructFactory("A"), "A")).To(Succeed())
+			container.PutFactory(SimpleFactory("A"), func(Doer) {})
 
-			var injectedA SomethingDoer
-
-			Expect(container.CallInjected(func(injected struct {
-				A SomethingDoer
-			}) {
-				injectedA = injected.A
+			called := false
+			Expect(container.CallInjected(func(a Doer) {
+				called = true
+				Expect(a).To(Equal(&Simple{"A"}))
 			})).To(Succeed())
-
-			Expect(injectedA).To(Equal(&SimpleStruct{"A"}))
+			Expect(called).To(BeTrue())
 
 		})
 
-		It("should restore 'core' configuration after a TestClear", func() {
+		It("should inject not a struct", func() {
 
-			Expect(container.PutNamedFactory(SimpleStructFactory("A"), "A")).To(Succeed())
-			Expect(container.TestPutNamedFactory(SimpleStructFactory("TEST"), "TEST", "A")).To(Succeed())
+			container.PutFactory(TrivialFactory("A"), func(Doer) {})
 
-			var injectedA *SimpleStruct
+			called := false
+			Expect(container.CallInjected(func(a Doer) {
+				called = true
+				Expect(a).To(Equal(Trivial("A")))
+			})).To(Succeed())
+			Expect(called).To(BeTrue())
+
+		})
+
+		It("should restore 'core' configuration after a CallInjected", func() {
+
+			container.PutFactory(SimpleFactory("A"), func(Doer) {})
+			container.TestPutFactory(SimpleFactory("TEST"), func(Doer) {})
 
 			// test
 
-			Expect(container.CallInjected(func(injected struct {
-				A *SimpleStruct
-			}) {
-				injectedA = injected.A
-			})).To(Succeed())
-
-			Expect(injectedA).To(Equal(&SimpleStruct{"TEST"}))
+			called := false
+			Expect(container.CallInjected(func(a Doer) {
+				called = true
+				Expect(a).To(Equal(&Simple{"TEST"}))
+			})).To(Succeed(), "First call (test) should be ok.")
+			Expect(called).To(BeTrue())
 
 			// core
 
-			Expect(container.CallInjected(func(injected struct {
-				A *SimpleStruct
-			}) {
-				injectedA = injected.A
-			})).To(Succeed())
-
-			Expect(injectedA).To(Equal(&SimpleStruct{"A"}))
+			called = false
+			Expect(container.CallInjected(func(a Doer) {
+				called = true
+				Expect(a).To(Equal(&Simple{"A"}))
+			})).To(Succeed(), "Second call (core) should be ok.")
+			Expect(called).To(BeTrue())
 
 		})
 
@@ -240,181 +166,101 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject a slice of pointers", func() {
 
-			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")).To(Succeed())
+			container.PutFactory(SimpleFactory("A1"))
+			container.PutFactory(SimpleFactory("A2"))
+			container.PutFactory(SimpleFactory("A3"))
 
-			var injectedA []*SimpleStruct
-
-			Expect(container.CallInjected(func(injected struct {
-				A []*SimpleStruct
-			}) {
-				injectedA = injected.A
+			called := false
+			Expect(container.CallInjected(func(slice []*Simple) {
+				called = true
+				Expect(slice).To(ConsistOf(
+					&Simple{"A1"},
+					&Simple{"A2"},
+					&Simple{"A3"}))
 			})).To(Succeed())
-
-			Expect(injectedA).To(ConsistOf(
-				&SimpleStruct{"A1"},
-				&SimpleStruct{"A2"},
-				&SimpleStruct{"A3"}))
+			Expect(called).To(BeTrue())
 
 		})
 
-		It("should inject a slice of values", func() {
+		It("should inject a slice with nil components", func() {
 
-			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")).To(Succeed())
+			container.PutFactory(SimpleFactory("A1"))
+			container.PutFactory(func() *Simple { return nil })
+			container.PutFactory(SimpleFactory("A3"))
 
-			var injectedA []SimpleStruct
-
-			Expect(container.CallInjected(func(injected struct {
-				A []SimpleStruct
-			}) {
-				injectedA = injected.A
+			called := false
+			Expect(container.CallInjected(func(slice []*Simple) {
+				called = true
+				Expect(slice).To(ConsistOf(
+					(*Simple)(nil),
+					&Simple{"A1"},
+					&Simple{"A3"}))
 			})).To(Succeed())
-
-			Expect(injectedA).To(ConsistOf(
-				SimpleStruct{"A1"},
-				SimpleStruct{"A2"},
-				SimpleStruct{"A3"}))
-
-		})
-
-		It("should inject a slice without nil components", func() {
-
-			Expect(container.PutNamedFactory(func() *SimpleStruct {
-				return nil
-			}, "NIL", "A")).To(Succeed())
-
-			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")).To(Succeed())
-
-			var injectedA []*SimpleStruct
-
-			Expect(container.CallInjected(func(injected struct {
-				A []*SimpleStruct
-			}) {
-				injectedA = injected.A
-			})).To(Succeed())
-
-			Expect(injectedA).To(ConsistOf(
-				&SimpleStruct{"A1"},
-				&SimpleStruct{"A2"},
-				&SimpleStruct{"A3"}))
+			Expect(called).To(BeTrue())
 
 		})
 
 		It("should inject a slice of interface", func() {
 
-			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")).To(Succeed())
+			container.PutFactory(SimpleFactory("A1"), func(Doer) {})
+			container.PutFactory(SimpleFactory("A2"), func(Doer) {})
+			container.PutFactory(SimpleFactory("A3"), func(Doer) {})
 
-			var injectedA []SomethingDoer
-
-			Expect(container.CallInjected(func(injected struct {
-				A []SomethingDoer
-			}) {
-				injectedA = injected.A
+			called := false
+			Expect(container.CallInjected(func(slice []Doer) {
+				called = true
+				Expect(slice).To(ConsistOf(
+					&Simple{"A1"},
+					&Simple{"A2"},
+					&Simple{"A3"}))
 			})).To(Succeed())
-
-			Expect(injectedA).To(ConsistOf(
-				&SimpleStruct{"A1"},
-				&SimpleStruct{"A2"},
-				&SimpleStruct{"A3"}))
+			Expect(called).To(BeTrue())
 
 		})
 
-	})
+		It("should inject a slice of interface (mixed)", func() {
 
-	Describe("with map injection", func() {
+			container.PutFactory(SimpleFactory("A1"), func(Doer) {})
+			container.PutFactory(TrivialFactory("T2"), func(Doer) {})
+			container.PutFactory(SimpleFactory("A2"), func(Doer) {})
 
-		It("should inject a map of pointers", func() {
-
-			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")).To(Succeed())
-
-			var injectedA map[string]*SimpleStruct
-
-			Expect(container.CallInjected(func(injected struct {
-				A map[string]*SimpleStruct
-			}) {
-				injectedA = injected.A
+			called := false
+			Expect(container.CallInjected(func(slice []Doer) {
+				called = true
+				Expect(slice).To(ConsistOf(
+					&Simple{"A1"},
+					Trivial("T2"),
+					&Simple{"A2"}))
 			})).To(Succeed())
-
-			Expect(injectedA).To(HaveLen(3))
-			Expect(injectedA).To(HaveKeyWithValue("A1", &SimpleStruct{"A1"}))
-			Expect(injectedA).To(HaveKeyWithValue("A2", &SimpleStruct{"A2"}))
-			Expect(injectedA).To(HaveKeyWithValue("A3", &SimpleStruct{"A3"}))
+			Expect(called).To(BeTrue())
 
 		})
 
-		It("should inject a map of values", func() {
+		It("should inject an empty slice", func() {
 
-			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")).To(Succeed())
-
-			var injectedA map[string]SimpleStruct
-
-			Expect(container.CallInjected(func(injected struct {
-				A map[string]SimpleStruct
-			}) {
-				injectedA = injected.A
+			called := false
+			Expect(container.CallInjected(func(slice []Doer) {
+				called = true
+				Expect(slice).To(BeEmpty())
 			})).To(Succeed())
-
-			Expect(injectedA).To(HaveLen(3))
-			Expect(injectedA).To(HaveKeyWithValue("A1", SimpleStruct{"A1"}))
-			Expect(injectedA).To(HaveKeyWithValue("A2", SimpleStruct{"A2"}))
-			Expect(injectedA).To(HaveKeyWithValue("A3", SimpleStruct{"A3"}))
+			Expect(called).To(BeTrue())
 
 		})
 
-		It("should inject a map without nil components", func() {
+		It("should inject only test components", func() {
 
-			Expect(container.PutNamedFactory(func() *SimpleStruct {
-				return nil
-			}, "NIL", "A")).To(Succeed())
+			container.PutFactory(SimpleFactory("A1"))
+			container.PutFactory(SimpleFactory("A2"))
+			container.PutFactory(SimpleFactory("A3"))
 
-			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")).To(Succeed())
+			container.TestPutFactory(SimpleFactory("TEST"))
 
-			var injectedA map[string]*SimpleStruct
-
-			Expect(container.CallInjected(func(injected struct {
-				A map[string]*SimpleStruct
-			}) {
-				injectedA = injected.A
+			called := false
+			Expect(container.CallInjected(func(slice []*Simple) {
+				called = true
+				Expect(slice).To(ConsistOf(&Simple{"TEST"}))
 			})).To(Succeed())
-
-			Expect(injectedA).To(HaveLen(3))
-			Expect(injectedA).To(HaveKeyWithValue("A1", &SimpleStruct{"A1"}))
-			Expect(injectedA).To(HaveKeyWithValue("A2", &SimpleStruct{"A2"}))
-			Expect(injectedA).To(HaveKeyWithValue("A3", &SimpleStruct{"A3"}))
-
-		})
-
-		It("should inject a map of interface", func() {
-
-			Expect(container.PutNamedFactory(SimpleStructFactory("A1"), "A1", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A2"), "A2", "A")).To(Succeed())
-			Expect(container.PutNamedFactory(SimpleStructFactory("A3"), "A3", "A")).To(Succeed())
-
-			var injectedA map[string]SomethingDoer
-
-			Expect(container.CallInjected(func(injected struct {
-				A map[string]SomethingDoer
-			}) {
-				injectedA = injected.A
-			})).To(Succeed())
-
-			Expect(injectedA).To(HaveLen(3))
-			Expect(injectedA).To(HaveKeyWithValue("A1", &SimpleStruct{"A1"}))
-			Expect(injectedA).To(HaveKeyWithValue("A2", &SimpleStruct{"A2"}))
-			Expect(injectedA).To(HaveKeyWithValue("A3", &SimpleStruct{"A3"}))
+			Expect(called).To(BeTrue())
 
 		})
 

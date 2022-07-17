@@ -1,134 +1,114 @@
 package ioc_test
 
-// Simple interface
+// Doer
 
-type SomethingDoer interface {
-	doSomething()
+type Doer interface {
+	do()
 }
 
-// Class SimpleStruct
+type BigDoer interface {
+	bigDo()
+}
 
-type SimpleStruct struct {
+type NotDoer interface {
+	notDo()
+}
+
+// Simple
+
+type Simple struct {
 	Tag string
 }
 
-func (self *SimpleStruct) doSomething() {}
+func (self *Simple) do() {}
 
-func SimpleStructFactory(tag string) func() *SimpleStruct {
-	return func() *SimpleStruct { return &SimpleStruct{tag} }
+func (self *Simple) bigDo() {}
+
+func SimpleFactory(tag string) func() *Simple {
+	return func() *Simple { return &Simple{tag} }
 }
 
-// Class InjectedStruct
+// Trivial
 
-type InjectedStruct struct {
-	SimpleStruct *SimpleStruct
+type Trivial string
+
+func (self Trivial) do() {}
+
+func TrivialFactory(tag string) func() Trivial {
+	return func() Trivial { return (Trivial)(tag) }
 }
 
-func (self *InjectedStruct) doSomething() {}
+// Injected
 
-func InjectedStructFactory(injected struct {
-	SimpleStruct *SimpleStruct `inject:"A"`
-}) *InjectedStruct {
-	return &InjectedStruct{injected.SimpleStruct}
+type Injected struct {
+	Simple *Simple
 }
 
-type InjectedObject struct {
-	A *SimpleStruct `inject:""`
+func InjectedFactory(simple *Simple) *Injected {
+	return &Injected{simple}
 }
 
-func (self *InjectedObject) doSomething() {}
+// Initialized
 
-// Class SliceInjectedStruct
-
-type SliceInjectedStruct struct {
-	SimpleStructs []*SimpleStruct
+type Initialized struct {
+	Simple *Simple `inject:""`
 }
 
-func SliceInjectedStructFactory(injected struct {
-	SimpleStructs []*SimpleStruct `inject:"A"`
-}) *SliceInjectedStruct {
-	return &SliceInjectedStruct{injected.SimpleStructs}
+// PostInitialized
+
+type PostInitialized struct {
+	Simple *Simple
 }
 
-type SliceInjectedObject struct {
-	SimpleStructs []*SimpleStruct `inject:"A"`
+func (self *PostInitialized) PostInit(simple *Simple) {
+	self.Simple = simple
 }
 
-// Class MapInjectedStruct
+// InterfaceInjected
 
-type MapInjectedStruct struct {
-	SimpleStructs map[string]*SimpleStruct
+type InterfaceInjected struct {
+	Doer Doer
 }
 
-func MapInjectedStructFactory(injected struct {
-	SimpleStructs map[string]*SimpleStruct `inject:"A"`
-}) *MapInjectedStruct {
-	return &MapInjectedStruct{injected.SimpleStructs}
+func InterfaceInjectedFactory(doer Doer) *InterfaceInjected {
+	return &InterfaceInjected{doer}
 }
 
-type MapInjectedObject struct {
-	SimpleStructs map[string]*SimpleStruct `inject:"A"`
+// InterfaceInitialized
+
+type InterfaceInitialized struct {
+	Doer Doer `inject:""`
 }
 
-// Class InterfaceInjectedStruct
+// InterfacePostInitialized
 
-type InterfaceInjectedStruct struct {
-	Doer SomethingDoer
+type InterfacePostInitialized struct {
+	Doer Doer
 }
 
-func InterfaceInjectedStructFactory(injected struct {
-	Doer SomethingDoer `inject:"A"`
-}) *InterfaceInjectedStruct {
-	return &InterfaceInjectedStruct{injected.Doer}
+func (self *InterfacePostInitialized) PostInit(doer Doer) {
+	self.Doer = doer
 }
 
-type InterfaceInjectedObject struct {
-	A SomethingDoer `inject:""`
+// SliceInjectedStruct
+
+type SliceInjected struct {
+	Simple []*Simple `inject:""`
 }
 
-type NamedInterfaceInjectedObject struct {
-	Doer SomethingDoer `inject:"A"`
+// InterfaceSliceInjected
+
+type InterfaceSliceInjected struct {
+	Doers []Doer `inject:""`
 }
 
-// Class InterfaceSliceInjectedStruct
-
-type InterfaceSliceInjectedStruct struct {
-	Doers []SomethingDoer
-}
-
-func InterfaceSliceInjectedStructFactory(injected struct {
-	Doers []SomethingDoer `inject:"A"`
-}) *InterfaceSliceInjectedStruct {
-	return &InterfaceSliceInjectedStruct{injected.Doers}
-}
-
-type InterfaceSliceInjectedObject struct {
-	Doers []SomethingDoer `inject:""`
-}
-
-// Class InterfaceMapInjectedStruct
-
-type InterfaceMapInjectedStruct struct {
-	Doers map[string]SomethingDoer
-}
-
-func InterfaceMapInjectedStructFactory(injected struct {
-	Doers map[string]SomethingDoer `inject:"A"`
-}) *InterfaceMapInjectedStruct {
-	return &InterfaceMapInjectedStruct{injected.Doers}
-}
-
-type InterfaceMapInjectedObject struct {
-	Doers map[string]SomethingDoer `inject:""`
-}
-
-// Class Looping (inject itself)
+// Looping (inject itself)
 
 type Looping struct {
 	Looping *Looping `inject:""`
 }
 
-// Ordered classes
+// Ordered
 
 type Ordered interface {
 	Name() string
@@ -139,89 +119,41 @@ type OrderRegister struct {
 	CloseOrder    []string
 }
 
-func NewOrderRegster() *OrderRegister {
+func NewOrderRegister() *OrderRegister {
 	return &OrderRegister{make([]string, 0), make([]string, 0)}
 }
 
 func (self *OrderRegister) registerPostInit(obj Ordered) {
 	self.PostInitOrder = append(self.PostInitOrder, obj.Name())
 }
+
 func (self *OrderRegister) registerClose(obj Ordered) error {
 	self.CloseOrder = append(self.CloseOrder, obj.Name())
 	return nil
 }
 
 type First struct {
-	OrderRegister *OrderRegister `inject:""`
+	Register *OrderRegister `inject:""`
 }
 
 func (self *First) Name() string { return "FIRST" }
-func (self *First) PostInit()    { self.OrderRegister.registerPostInit(self) }
-func (self *First) Close() error { return self.OrderRegister.registerClose(self) }
+func (self *First) PostInit()    { self.Register.registerPostInit(self) }
+func (self *First) Close() error { return self.Register.registerClose(self) }
 
 type Second struct {
-	OrderRegister *OrderRegister `inject:""`
-	Injected      *First         `inject:"First"`
+	Register *OrderRegister `inject:""`
+	Injected *First         `inject:""`
 }
 
 func (self *Second) Name() string { return "SECOND" }
-func (self *Second) PostInit()    { self.OrderRegister.registerPostInit(self) }
-func (self *Second) Close() error { return self.OrderRegister.registerClose(self) }
+func (self *Second) PostInit()    { self.Register.registerPostInit(self) }
+func (self *Second) Close() error { return self.Register.registerClose(self) }
 
 type Third struct {
-	OrderRegister *OrderRegister `inject:""`
-	Injected      *Second        `inject:"Second"`
+	Register *OrderRegister `inject:""`
+	Injected *Second        `inject:""`
 }
 
 func (self *Third) Name() string { return "THIRD" }
-func (self *Third) PostInit()    { self.OrderRegister.registerPostInit(self) }
-func (self *Third) Close() error { return self.OrderRegister.registerClose(self) }
-
-// Not pointers injections
-
-type MapProvider interface {
-	GetMap() map[string]string
-}
-
-type MyMap map[string]string
-
-func NewMap(key, value string) MyMap {
-	m := make(map[string]string, 0)
-	m[key] = value
-	return m
-}
-func (self MyMap) GetMap() map[string]string { return self }
-
-func CreateWrapMap(injected struct {
-	Map MyMap `inject:"MyMap"`
-}) MyMap {
-	return injected.Map
-}
-
-type MySuperMap map[string]string
-
-func CreateSuperMap(injected struct {
-	Maps []MapProvider `inject:"Maps"`
-}) MySuperMap {
-	super := make(map[string]string, 0)
-	for _, m := range injected.Maps {
-		for k, v := range m.GetMap() {
-			super[k] = v
-		}
-	}
-	return super
-}
-
-type MyHyperMap map[string]string
-
-func CreateHyperMap(injected struct {
-	Maps map[string]MapProvider `inject:"Maps"`
-}) MyHyperMap {
-	hyper := make(map[string]string, 0)
-	for name, m := range injected.Maps {
-		for k, v := range m.GetMap() {
-			hyper[name+"."+k] = v
-		}
-	}
-	return hyper
-}
+func (self *Third) PostInit()    { self.Register.registerPostInit(self) }
+func (self *Third) Close() error { return self.Register.registerClose(self) }
