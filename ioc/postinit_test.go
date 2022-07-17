@@ -42,7 +42,7 @@ var _ = Describe("IOC post-init and close", func() {
 			third = injected
 		})).To(Succeed())
 
-		Expect(third.Register.CloseOrder).To(Equal([]string{"FIRST", "SECOND", "THIRD"}))
+		Expect(third.Register.CloseOrder).To(Equal([]string{"THIRD", "SECOND", "FIRST"}))
 
 	})
 

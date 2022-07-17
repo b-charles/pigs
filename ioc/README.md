@@ -207,7 +207,7 @@ When each necessary components are fully initialized, the framework call the giv
 
 #### Close
 
-After the main function executed, the container will close automatically every component implementing the interface `io.Closer`. If a component panics or returns a non-null error at the call of its method `Close`, the error is silently discarded. The `Close` methods are called in the same order than the components are instantiated (component without dependencies first, main components last).
+After the main function executed, the container will close automatically every component implementing the interface `io.Closer`. If a component panics or returns a non-null error at the call of its method `Close`, the error is silently discarded. The `Close` methods are called in the reverse order of component instantiation (main components first, components without dependencies last).
 
 ### Redefinition
 

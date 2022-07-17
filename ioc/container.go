@@ -329,8 +329,8 @@ func (self *Container) CallInjected(method any) error {
 	args, err := self.getArguments(methodValue)
 
 	defer func() {
-		for _, instance := range self.closables {
-			instance.Close()
+		for c := len(self.closables) - 1; c >= 0; c-- {
+			self.closables[c].Close()
 		}
 		self.closables = []*instance{}
 	}()
