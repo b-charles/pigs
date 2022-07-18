@@ -6,46 +6,40 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+func parse(args []string) map[string]string {
+	if env, err := ParseArgs(args); err != nil {
+		panic(err)
+	} else {
+		return env
+	}
+}
+
 var _ = Describe("Args", func() {
 
 	It("should parse value between simple quote", func() {
-
-		source := ParseArgs([]string{
-			"--jamiroquai='Virtual Insanity'",
-		})
-
-		Expect(source).Should(HaveKeyWithValue("jamiroquai", "Virtual Insanity"))
-
+		source := parse([]string{"--jamiroquai='Virtual Insanity'"})
+		Expect(source).To(HaveKeyWithValue("jamiroquai", "Virtual Insanity"))
 	})
 
 	It("should parse value between double quote", func() {
-
-		source := ParseArgs([]string{
-			"--santana=\"Flor D'Luna\"",
-		})
-
-		Expect(source).Should(HaveKeyWithValue("santana", "Flor D'Luna"))
-
+		source := parse([]string{"--santana=\"Flor D'Luna\""})
+		Expect(source).To(HaveKeyWithValue("santana", "Flor D'Luna"))
 	})
 
 	It("should parse boolean", func() {
-
-		source := ParseArgs([]string{
-			"--yes",
-		})
-
-		Expect(source).Should(HaveKeyWithValue("yes", "true"))
-
+		source := parse([]string{"--yes"})
+		Expect(source).To(HaveKeyWithValue("yes", "true"))
 	})
 
 	It("should parse false boolean", func() {
+		source := parse([]string{"--no-yes"})
+		Expect(source).To(HaveKeyWithValue("yes", "false"))
+	})
 
-		source := ParseArgs([]string{
-			"--no-yes",
-		})
-
-		Expect(source).Should(HaveKeyWithValue("yes", "false"))
-
+	It("should returns an error for unknown pattern", func() {
+		Expect(func() {
+			parse([]string{"hello=goodbye"})
+		}).To(Panic())
 	})
 
 })

@@ -24,22 +24,23 @@ func ParseEnvVar(envvar []string) map[string]string {
 
 }
 
-type EnvVarConfigSource struct {
-	*SimpleConfigSource
+type EnvVarConfigSource map[string]string
+
+func (self EnvVarConfigSource) GetPriority() int {
+	return CONFIG_SOURCE_PRIORITY_ENV_VAR
 }
 
-func NewEnvVarConfigSource() *EnvVarConfigSource {
+func (self EnvVarConfigSource) LoadEnv(config MutableConfig) error {
+	for k, v := range self {
+		config.Set(k, v)
+	}
+	return nil
+}
 
-	env := ParseEnvVar(os.Environ())
-
-	return &EnvVarConfigSource{
-		&SimpleConfigSource{
-			Priority: CONFIG_SOURCE_PRIORITY_ENV_VAR,
-			Env:      env,
-		}}
-
+func (self EnvVarConfigSource) String() string {
+	return stringify(self)
 }
 
 func init() {
-	ioc.PutFactory(NewEnvVarConfigSource, func(ConfigSource) {})
+	ioc.Put(EnvVarConfigSource(ParseEnvVar(os.Environ())), func(ConfigSource) {})
 }

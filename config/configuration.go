@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"regexp"
 	"sort"
 	"strings"
@@ -14,7 +15,55 @@ import (
 
 type ConfigSource interface {
 	GetPriority() int
-	LoadEnv() map[string]string
+	LoadEnv(MutableConfig) error
+}
+
+/*
+ * Mutable config
+ */
+
+func keys(m map[string]string) []string {
+
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+
+	return keys
+
+}
+
+type MutableConfig map[string]string
+
+func (self MutableConfig) HasKey(key string) bool {
+	_, present := self[key]
+	return present
+}
+
+func (self MutableConfig) Keys() []string {
+	return keys(self)
+}
+
+func (self MutableConfig) Get(key string) (string, error) {
+	return resolveValue(self, key, map[string]bool{}, false)
+}
+
+func (self MutableConfig) Lookup(key string) (string, bool, error) {
+	_, p := self[key]
+	if p {
+		v, e := resolveValue(self, key, map[string]bool{}, false)
+		return v, true, e
+	} else {
+		return "", false, nil
+	}
+}
+
+func (self MutableConfig) Set(key, value string) {
+	self[key] = value
+}
+
+func (self MutableConfig) String() string {
+	return stringify(self)
 }
 
 /*
@@ -23,60 +72,56 @@ type ConfigSource interface {
 
 type Configuration map[string]string
 
-/*
- * Sort sources by priority
- */
-
-type byPriority []ConfigSource
-
-func (self byPriority) Len() int {
-	return len(self)
+func (self *Configuration) Keys() []string {
+	return keys(*self)
 }
 
-func (self byPriority) Swap(i, j int) {
-	self[i], self[j] = self[j], self[i]
+func (self *Configuration) Get(key string) string {
+	return (*self)[key]
 }
 
-func (self byPriority) Less(i, j int) bool {
-	return self[i].GetPriority() < self[j].GetPriority()
+func (self *Configuration) Lookup(key string) (string, bool) {
+	v, p := (*self)[key]
+	return v, p
+}
+
+func (self Configuration) String() string {
+	return stringify(self)
 }
 
 /*
  * Factory
  */
 
-func CreateConfiguration(sources []ConfigSource) Configuration {
+func CreateConfiguration(sources []ConfigSource) (Configuration, error) {
 
-	sort.Sort(byPriority(sources))
+	sort.Slice(sources, func(i, j int) bool {
+		return sources[i].GetPriority() < sources[j].GetPriority()
+	})
 
-	env := make(map[string]string)
+	mutable := MutableConfig(map[string]string{})
 	for _, source := range sources {
-		for key, value := range source.LoadEnv() {
-			env[key] = value
+		err := source.LoadEnv(mutable)
+		if err != nil {
+			return nil, fmt.Errorf("Error during loading configuration from '%v': %w", source, err)
 		}
 	}
 
-	resolved := make(map[string]bool)
-	pathMap := make(map[string]bool)
-
-	for key := range env {
-		if _, err := resolveValue(env, resolved, key, pathMap); err != nil {
-			panic(err)
+	for key := range mutable {
+		if _, err := resolveValue(mutable, key, map[string]bool{}, true); err != nil {
+			return nil, err
 		}
 	}
 
-	return env
+	return Configuration(mutable), nil
 
 }
 
 func init() {
 
-	ioc.PutFactory(
-		func(injected struct {
-			ConfigSources []ConfigSource
-		}) Configuration {
-			return CreateConfiguration(injected.ConfigSources)
-		})
+	ioc.PutFactory(func(sources []ConfigSource) (Configuration, error) {
+		return CreateConfiguration(sources)
+	})
 
 }
 
@@ -130,34 +175,24 @@ func (self *CyclicLoopError) Error() string {
 
 var placeholderRegexp *regexp.Regexp = regexp.MustCompile("\\${\\s*([^{}]+)\\s*}")
 
-func resolveValue(env map[string]string, resolved map[string]bool, key string, pathMap map[string]bool) (string, *CyclicLoopError) {
+func resolveValue(env map[string]string, key string, traveled map[string]bool, record bool) (string, *CyclicLoopError) {
 
-	value := env[key]
-	if _, res := resolved[key]; res {
-		return value, nil
+	value, exist := env[key]
+	if !exist {
+		return "", nil
 	}
+
+	if t, p := traveled[key]; p && t {
+		return "", newCyclicLoopError(key, value)
+	}
+	traveled[key] = true
 
 	match := placeholderRegexp.FindStringSubmatch(value)
 	for match != nil {
 
-		subkey := match[1]
-		subvalue := ""
-		var err *CyclicLoopError
-
-		if inpath, pres := pathMap[subkey]; pres && inpath {
-			return "", newCyclicLoopError(key, value)
-		}
-
-		if _, exist := env[subkey]; exist {
-
-			pathMap[subkey] = true
-			subvalue, err = resolveValue(env, resolved, subkey, pathMap)
-			pathMap[subkey] = false
-
-			if err != nil {
-				return "", err.push(key, value)
-			}
-
+		subvalue, err := resolveValue(env, match[1], traveled, record)
+		if err != nil {
+			return "", err.push(key, value)
 		}
 
 		value = strings.Replace(value, match[0], subvalue, -1)
@@ -166,8 +201,11 @@ func resolveValue(env map[string]string, resolved map[string]bool, key string, p
 
 	}
 
-	env[key] = value
-	resolved[key] = true
+	traveled[key] = false
+
+	if record {
+		env[key] = value
+	}
 
 	return value, nil
 

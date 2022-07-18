@@ -6,13 +6,11 @@ Configure the application.
 
 Hard-coding the configuration in your code is not a good idea. Many people have tried and they are unanimous: don't do it.
 
-There is different approach to configure your application: command line arguments, environment variables, configuration files in different format (properties, json, yaml, toml, ...) ... This module can be used to get all theses sources of configuration and merge them in an simple and [injectable](../ioc/README.md) `map[string]string`.
+There is different approach to configure your application: command line arguments, environment variables, configuration files in different format (properties, json, yaml, toml, ...) ... This module can be used to get all theses sources of configuration and merge them in an simple and [injectable](../ioc/README.md) component.
 
 ## What's supported?
 
-[The Twelve-Factor App](https://12factor.net/config) manifesto is pretty specific about how it should be done: you should use environment variables. We choosed to add the support of command line arguments, and some utilities to define default values, but nothing else.
-
-But adding other sources of configuration can be easily done.
+For now, the framework supports command line arguments, environment variables and some utilities to define default values. But adding other sources of configuration can be easily done.
 
 ## How it works?
 
@@ -53,7 +51,7 @@ func init() {
 }
 ```
 
-The module can also be used to define some values for unit tests. When using the function `SetEnvForTests`, a special component is created using the given map as a configuration source and defined in the test scope. The method should be called in the fixture (before tests) of unit tests, and the method `ioc.ClearTests` should be called to clear the definitions.
+The module can also be used to define some values for unit tests. When using the function `SetTest`, a special component is created using the given map as a configuration source and defined in the test scope. That component will be automatically deleted after the call of `ioc.CallInjected`, so the method should be called in a fixture (before tests) of unit tests.
 
 #### Environment variables
 
@@ -76,12 +74,7 @@ Arguments can be in one of theses format (with `[name]` the name of the variable
 
 ### The `Configuration`
 
-The `Configuration` component is simply defined as a map of string to string:
-```go
-type Configuration map[string]string
-```
-
-The module manages the merging of all sources in this component, and resolve placeholders: for each value, each occurance of the pattern `${<myvalue>}` is replaced with the value of `<myvalue>`. So, if a config source defines a value `name` with `Batman` and another value `whoami` with `I'm ${name}`, the resolving process will convert `whoami` to `I'm Batman`. Placeholders can be chained and nested:
+The `Configuration` component manages the merging of all sources in this component, and resolve placeholders: for each value, each occurance of the pattern `${<myvalue>}` is replaced with the value of `<myvalue>`. So, if a config source defines a value `name` with `Batman` and another value `whoami` with `I'm ${name}`, the resolving process will convert `whoami` to `I'm Batman`. Placeholders can be chained and nested:
 | name | value | resolved |
 | --- | --- | --- |
 | `ironman` | `Tony Stark` | `Tony Stark` |
@@ -90,9 +83,7 @@ The module manages the merging of all sources in this component, and resolve pla
 | `what` | `iron` | `iron` |
 | `who` | `${${what}man}` | `Tony Stark` |
 
-Application needing to be configured can retrieve it by its name `github.com/b-charles/pigs/config\Configuration`. Of course, modifying the component or the contained value is not a good idea: define and use a dedicated `ConfigSource` instead.
-
 ## And now?
 
-The usage of this module should be efficient but not convenient. The module [smartconf](../smartconf/README.md) adds the concept of `Parser` to convert a string to something else, and can be useful to get a chunck of typed configuration values.
+The usage of this module should be efficient but not convenient. The module [smartconf](../smartconf/README.md) can be useful to get a chunck of typed configuration values.
 
