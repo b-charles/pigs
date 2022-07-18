@@ -230,6 +230,9 @@ func (self *Container) getValue(target reflect.Type) (reflect.Value, error) {
 		elemTarget := target.Elem()
 
 		instances, err = self.getInstances(elemTarget)
+		if err != nil {
+			return reflect.Zero(target), err
+		}
 
 		slice := reflect.MakeSlice(target, 0, len(instances))
 		if len(instances) == 0 {
