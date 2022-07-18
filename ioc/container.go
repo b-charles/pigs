@@ -22,6 +22,7 @@ type Container struct {
 	creationTime   time.Time
 	instances      map[*component]*instance
 	closables      []*instance
+	status         *component
 }
 
 // NewContainer creates a new Container.
@@ -34,7 +35,16 @@ func NewContainer() *Container {
 		instances:      map[*component]*instance{},
 		closables:      []*instance{}}
 
-	container.Put(container)
+	container.PutFactory(func() (*Container, error) {
+		return container, nil
+	})
+
+	container.PutFactory(func() (*ContainerStatus, error) {
+		return &ContainerStatus{
+			container: container,
+		}, nil
+	})
+	container.status = container.coreComponents[containerStatus_type][0]
 
 	return container
 
@@ -337,6 +347,11 @@ func (self *Container) CallInjected(method any) error {
 
 	if err != nil {
 		return err
+	}
+
+	// update status
+	if status, present := self.instances[self.status]; present {
+		status.value.Interface().(*ContainerStatus).update()
 	}
 
 	// release unused instances

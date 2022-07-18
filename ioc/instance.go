@@ -119,6 +119,6 @@ func (self *instance) String() string {
 	if self == nil {
 		return "nil"
 	} else {
-		return self.value.String()
+		return fmt.Sprintf("%v", self.value.Interface())
 	}
 }

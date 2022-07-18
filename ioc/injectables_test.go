@@ -20,6 +20,10 @@ type Simple struct {
 	Tag string
 }
 
+func (self *Simple) String() string {
+	return self.Tag
+}
+
 func (self *Simple) do() {}
 
 func (self *Simple) bigDo() {}
