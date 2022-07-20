@@ -11,9 +11,11 @@ import (
 var (
 	colorReset  = "\033[0m"
 	colorRed    = "\033[31m"
-	colorPurple = "\033[35m"
 	colorGreen  = "\033[32m"
+	colorYellow = "\033[33m"
 	colorBlue   = "\033[34m"
+	colorPurple = "\033[35m"
+	colorCyan   = "\033[36m"
 )
 
 // Types utilities
@@ -87,6 +89,7 @@ func sortComponentsRecords(slice []ComponentRecords) {
 // Instance wrapper
 
 type InstanceRecords struct {
+	Core     bool
 	Type     reflect.Type
 	String   string
 	Closable bool
@@ -94,10 +97,24 @@ type InstanceRecords struct {
 
 func (self InstanceRecords) write(builder *strings.Builder) {
 
+	if self.Core {
+		builder.WriteString("[")
+		builder.WriteString(colorCyan)
+		builder.WriteString("Core")
+		builder.WriteString(colorReset)
+		builder.WriteString("] ")
+	} else {
+		builder.WriteString("[")
+		builder.WriteString(colorPurple)
+		builder.WriteString("Test")
+		builder.WriteString(colorReset)
+		builder.WriteString("] ")
+	}
+
 	builder.WriteString(typeAlignString(self.Type))
 	if self.Closable {
 		builder.WriteString(" (")
-		builder.WriteString(colorBlue)
+		builder.WriteString(colorYellow)
 		builder.WriteString("Closable")
 		builder.WriteString(colorReset)
 		builder.WriteString(")")
@@ -183,7 +200,10 @@ func (self *ContainerStatus) update() {
 			str = inst.String()
 		}
 
+		_, test := self.container.testComponents[comp.main]
+
 		self.Instances = append(self.Instances, InstanceRecords{
+			Core:     !test,
 			Type:     comp.main,
 			String:   str,
 			Closable: inst.isClosable(),
