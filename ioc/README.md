@@ -76,9 +76,11 @@ Here, if `injected` is injected by the container, the field `AllComponents` will
 
 #### Testing
 
-Like it's said in the main goals of the framework, there is no concept of scope, or at least not extendable scope. In fact, the container is divided in two set of components: one for the core components, and one for tests. These two sets are comparable to scopes: every time an injection is proceeded, the container start by searching any component in the test set. If nothing is found, then the container use the core set. In case of auto-discovery injection (slice), if at least one matching component is found in the test set, that components are injected and the components in the core set are not used (which means you can not run a test with an auto-discovered slice empty when it is not outside of testing).
+Like it's said in the main goals of the framework, there is no concept of scope, or at least not extendable scope. In fact, the container is divided in two set of components: one for the core components, and one for tests. Every time an injection is proceeded, the container start by searching any component in the test set. If nothing is found, then the container use the core set. In case of auto-discovery injection (slice), if at least one matching component is found in the test set, that components are injected and the components in the core set are not used (which means you can not run a test with an auto-discovered slice empty when it is not outside of testing).
 
 The API is defined to record a component in the core set or in the test set. With that mechanisms, it's easy to define clean unit test that mock some components and limit each test to a part of the application (not the entire application, but not only one component neither).
+
+Last little trick: you can promote a core component as a test component. If during the instanciation of a test component by a factory (a function which returns the component), a component of the same type produced by the factory is required, the container doesn't throw a cyclic dependency error (as it should) but search if a core component can be used. This mechanism can be usefull to define quickly one composant which will be injected in a slice by auto-discovery, or to configure a component for a test environment.
 
 ### Container and components lifecycles
 
@@ -217,7 +219,7 @@ So, if you are running unit tests, you have to defined some fixture to redefined
 
 If no test component is defined, the framework considers that you are really running your application. In this case, in order to consume the least RAM as possible, all unused component instances and all component definitions will be released (forgotten by the framework) and can be deleted by the garbage collector if no other component reference them.
 
-## Usage expample
+## Usage example
 
 To a better understanding of how the framework can be used, here an extract of unit tests with `Ginkgo`:
 
