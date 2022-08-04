@@ -200,10 +200,8 @@ func (self *ContainerStatus) update() {
 			str = inst.String()
 		}
 
-		_, test := self.container.testComponents[comp.main]
-
 		self.Instances = append(self.Instances, InstanceRecords{
-			Core:     !test,
+			Core:     comp.scope == core,
 			Type:     comp.main,
 			String:   str,
 			Closable: inst.isClosable(),

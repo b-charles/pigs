@@ -41,7 +41,7 @@ func (self *instance) initialize(stack *componentStack) error {
 		} else if !field.CanSet() {
 			return fmt.Errorf("The field '%v' of %v is not settable.", structField.Name, self)
 		} else if fieldValue, err := self.producer.container.getValue(structField.Type, stack); err != nil {
-			return fmt.Errorf("Can not inject field '%v' of %v: %w", structField.Name, self, err)
+			return fmt.Errorf("Can not inject field '%v': %w", structField.Name, err)
 		} else {
 			field.Set(fieldValue)
 		}

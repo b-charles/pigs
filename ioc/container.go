@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-type context uint
+type scope uint
 
 const (
-	core context = iota
+	core scope = iota
 	test
 )
 
@@ -58,12 +58,12 @@ func (self *Container) CreationTime() time.Time {
 // REGISTRATION
 
 // putIn creates a new component by its factory, signature functions
-// (sigWrappers) and in the given context.
-func (self *Container) putIn(factory reflect.Value, sigWrappers []any, context context) error {
+// (sigWrappers) and in the given scope.
+func (self *Container) putIn(factory reflect.Value, sigWrappers []any, scope scope) error {
 
-	components := self.getComponentMap(context)
+	components := self.getComponentMap(scope)
 
-	comp, err := newComponent(self, factory, sigWrappers)
+	comp, err := newComponent(self, scope, factory, sigWrappers)
 	if err != nil {
 		return err
 	}
@@ -154,14 +154,14 @@ func (self *Container) instanciates(component *component, stack *componentStack)
 
 }
 
-// getComponentMap gets the map corresponding to the given context.
-func (self *Container) getComponentMap(context context) map[reflect.Type][]*component {
-	if context == core {
+// getComponentMap gets the map corresponding to the given scope.
+func (self *Container) getComponentMap(scope scope) map[reflect.Type][]*component {
+	if scope == core {
 		return self.coreComponents
-	} else if context == test {
+	} else if scope == test {
 		return self.testComponents
 	} else {
-		panic(fmt.Errorf("Unknown context %v", context))
+		panic(fmt.Errorf("Unknown scope %v", scope))
 	}
 }
 

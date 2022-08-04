@@ -10,6 +10,7 @@ var error_type = reflect.TypeOf(func(error) {}).In(0)
 // A component is a singleton recording, managed by a Container.
 type component struct {
 	container  *Container
+	scope      scope
 	main       reflect.Type
 	signatures []reflect.Type
 	factory    reflect.Value
@@ -100,7 +101,7 @@ func extractSignatures(signFuncs []any) ([]reflect.Type, error) {
 
 // newComponent returns a new component, build from the containing container,
 // the factory and the signature functions.
-func newComponent(container *Container, factory reflect.Value, signFuncs []any) (*component, error) {
+func newComponent(container *Container, scope scope, factory reflect.Value, signFuncs []any) (*component, error) {
 
 	// factory
 	main, factoryValue, err := checkFactory(factory)
@@ -130,7 +131,7 @@ func newComponent(container *Container, factory reflect.Value, signFuncs []any) 
 	}
 
 	// return
-	return &component{container, main, signatures, factoryValue}, nil
+	return &component{container, scope, main, signatures, factoryValue}, nil
 
 }
 
