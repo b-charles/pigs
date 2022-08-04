@@ -165,20 +165,49 @@ func (self *Container) getComponentMap(context context) map[reflect.Type][]*comp
 	}
 }
 
-// getInstancesOfContext returns the instances for a target typ and contained
-// in a given context.
-func (self *Container) getInstancesOfContext(
-	typ reflect.Type,
-	stack *componentStack,
-	context context) ([]*instance, error) {
+// getInstances get all instances for a target typ. It searchs in the test and
+// (if nothing is found) core scope.
+func (self *Container) getInstances(typ reflect.Type, stack *componentStack) ([]*instance, error) {
 
-	components := self.getComponentMap(context)
+	// test
 
-	if list, ok := components[typ]; !ok {
+	if list, ok := self.testComponents[typ]; ok {
 
-		return []*instance{}, nil
+		instances := make([]*instance, 0, len(list))
 
-	} else {
+		for _, component := range list {
+
+			if instance, err := self.instanciates(component, stack); err != nil {
+
+				// try core if direct cyclic dependency
+				if cyclic, ok := err.(*cyclicError); ok && len(cyclic.components) == 1 {
+					if list, ok := self.coreComponents[typ]; ok && len(list) == 1 {
+						if coreInstance, coreErr := self.instanciates(list[0], stack); coreErr != nil {
+							return nil, err
+						} else {
+							instances = append(instances, coreInstance)
+							continue
+						}
+					}
+				}
+
+				return nil, err
+
+			} else {
+
+				instances = append(instances, instance)
+
+			}
+
+		}
+
+		return instances, nil
+
+	}
+
+	// core
+
+	if list, ok := self.coreComponents[typ]; ok {
 
 		instances := make([]*instance, 0, len(list))
 
@@ -194,24 +223,10 @@ func (self *Container) getInstancesOfContext(
 
 		return instances, nil
 
-	}
-
-}
-
-// getInstances get all instances for a target typ. It searchs in the test and
-// (if nothing is found) core context.
-func (self *Container) getInstances(typ reflect.Type, stack *componentStack) ([]*instance, error) {
-
-	if instances, err := self.getInstancesOfContext(typ, stack, test); err != nil {
-		return nil, err
-	} else if len(instances) > 0 {
-		return instances, nil
-	}
-
-	if instances, err := self.getInstancesOfContext(typ, stack, core); err != nil {
-		return nil, err
 	} else {
-		return instances, nil
+
+		return []*instance{}, nil
+
 	}
 
 }

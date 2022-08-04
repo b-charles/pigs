@@ -106,6 +106,19 @@ var _ = Describe("IOC factory", func() {
 
 		})
 
+		It("should be possible to promote a core component to test", func() {
+
+			container.PutFactory(SimpleFactory("A1"))
+			container.TestPutFactory(func(a1 *Simple) *Simple { return a1 })
+
+			container.Put(&SliceInjected{})
+
+			Expect(container.CallInjected(func(injected *SliceInjected) {
+				Expect(injected.Simple).To(ConsistOf(&Simple{"A1"}))
+			})).To(Succeed())
+
+		})
+
 	})
 
 	Describe("with interface", func() {
