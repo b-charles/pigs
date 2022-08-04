@@ -94,6 +94,18 @@ var _ = Describe("IOC factory", func() {
 
 		})
 
+		It("should throw an error if a cyclic dependency is detected", func() {
+
+			container.PutFactory(func(looping *Looping) *Looping {
+				return &Looping{looping}
+			})
+
+			Expect(container.CallInjected(func(injected *Looping) {
+				Expect(injected).To(Equal(injected.Looping))
+			})).To(HaveOccurred())
+
+		})
+
 	})
 
 	Describe("with interface", func() {

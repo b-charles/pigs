@@ -135,13 +135,20 @@ func newComponent(container *Container, factory reflect.Value, signFuncs []any) 
 }
 
 // instanciate returns an instance of the component.
-func (self *component) instanciate() (*instance, error) {
+func (self *component) instanciate(stack *componentStack) (*instance, error) {
 
 	if self == nil {
 		return nil, nil
 	}
 
-	outs, err := self.container.callInjected(self.factory)
+	if err := stack.push(self); err != nil {
+		return nil, err
+	}
+
+	outs, err := self.container.callInjected(self.factory, stack)
+
+	stack.pop(self)
+
 	if err != nil {
 		return nil, fmt.Errorf("Error during call of factory of '%v': %w", self, err)
 	} else if !outs[1].IsNil() {

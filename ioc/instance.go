@@ -15,7 +15,7 @@ type instance struct {
 
 // initialize initializes the instance: if the instance is a struct or a
 // pointer to a struct, each tagged 'inject' field is injected.
-func (self *instance) initialize() error {
+func (self *instance) initialize(stack *componentStack) error {
 
 	if self == nil {
 		return nil
@@ -40,7 +40,7 @@ func (self *instance) initialize() error {
 			continue
 		} else if !field.CanSet() {
 			return fmt.Errorf("The field '%v' of %v is not settable.", structField.Name, self)
-		} else if fieldValue, err := self.producer.container.getValue(structField.Type); err != nil {
+		} else if fieldValue, err := self.producer.container.getValue(structField.Type, stack); err != nil {
 			return fmt.Errorf("Can not inject field '%v' of %v: %w", structField.Name, self, err)
 		} else {
 			field.Set(fieldValue)
@@ -53,7 +53,7 @@ func (self *instance) initialize() error {
 }
 
 // postInit call the PostInit method (if defined).
-func (self *instance) postInit() error {
+func (self *instance) postInit(stack *componentStack) error {
 
 	if self == nil {
 		return nil
@@ -64,7 +64,7 @@ func (self *instance) postInit() error {
 		return nil
 	}
 
-	if out, err := self.producer.container.callInjected(postInit); err != nil {
+	if out, err := self.producer.container.callInjected(postInit, stack); err != nil {
 
 		return fmt.Errorf("Error during PostInit call of '%v': %w", self, err)
 

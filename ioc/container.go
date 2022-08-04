@@ -126,23 +126,23 @@ func (self *Container) TestPut(component any, signFuncs ...any) error {
 // instanciates gets the instance of the given component. If the instance is
 // already created, the instance is returned. If not, the instance is created,
 // recorded, initialized, post-initialized and returned.
-func (self *Container) instanciates(component *component) (*instance, error) {
+func (self *Container) instanciates(component *component, stack *componentStack) (*instance, error) {
 
 	if instance, ok := self.instances[component]; ok {
 		return instance, nil
 	}
 
-	instance, err := component.instanciate()
+	instance, err := component.instanciate(stack)
 	if err != nil {
 		return nil, err
 	}
 
 	self.instances[component] = instance
 
-	if err := instance.initialize(); err != nil {
+	if err := instance.initialize(stack); err != nil {
 		return instance, err
 	}
-	if err := instance.postInit(); err != nil {
+	if err := instance.postInit(stack); err != nil {
 		return instance, err
 	}
 
@@ -167,7 +167,10 @@ func (self *Container) getComponentMap(context context) map[reflect.Type][]*comp
 
 // getInstancesOfContext returns the instances for a target typ and contained
 // in a given context.
-func (self *Container) getInstancesOfContext(typ reflect.Type, context context) ([]*instance, error) {
+func (self *Container) getInstancesOfContext(
+	typ reflect.Type,
+	stack *componentStack,
+	context context) ([]*instance, error) {
 
 	components := self.getComponentMap(context)
 
@@ -181,7 +184,7 @@ func (self *Container) getInstancesOfContext(typ reflect.Type, context context) 
 
 		for _, component := range list {
 
-			if instance, err := self.instanciates(component); err != nil {
+			if instance, err := self.instanciates(component, stack); err != nil {
 				return nil, err
 			} else {
 				instances = append(instances, instance)
@@ -197,15 +200,15 @@ func (self *Container) getInstancesOfContext(typ reflect.Type, context context) 
 
 // getInstances get all instances for a target typ. It searchs in the test and
 // (if nothing is found) core context.
-func (self *Container) getInstances(typ reflect.Type) ([]*instance, error) {
+func (self *Container) getInstances(typ reflect.Type, stack *componentStack) ([]*instance, error) {
 
-	if instances, err := self.getInstancesOfContext(typ, test); err != nil {
+	if instances, err := self.getInstancesOfContext(typ, stack, test); err != nil {
 		return nil, err
 	} else if len(instances) > 0 {
 		return instances, nil
 	}
 
-	if instances, err := self.getInstancesOfContext(typ, core); err != nil {
+	if instances, err := self.getInstancesOfContext(typ, stack, core); err != nil {
 		return nil, err
 	} else {
 		return instances, nil
@@ -214,9 +217,9 @@ func (self *Container) getInstances(typ reflect.Type) ([]*instance, error) {
 }
 
 // getValue returns an injectable value for the given target.
-func (self *Container) getValue(target reflect.Type) (reflect.Value, error) {
+func (self *Container) getValue(target reflect.Type, stack *componentStack) (reflect.Value, error) {
 
-	instances, err := self.getInstances(target)
+	instances, err := self.getInstances(target, stack)
 	if err != nil {
 		return reflect.Zero(target), err
 	}
@@ -229,7 +232,7 @@ func (self *Container) getValue(target reflect.Type) (reflect.Value, error) {
 
 		elemTarget := target.Elem()
 
-		instances, err = self.getInstances(elemTarget)
+		instances, err = self.getInstances(elemTarget, stack)
 		if err != nil {
 			return reflect.Zero(target), err
 		}
@@ -276,7 +279,7 @@ func (self *Container) getValue(target reflect.Type) (reflect.Value, error) {
 // INJECTION
 
 // getArguments returns initialized and injected arguments to call the given method.
-func (self *Container) getArguments(method reflect.Value) ([]reflect.Value, error) {
+func (self *Container) getArguments(method reflect.Value, stack *componentStack) ([]reflect.Value, error) {
 
 	if method.Kind() != reflect.Func {
 		return nil, fmt.Errorf("Can not use '%v' as a function.", method)
@@ -291,7 +294,7 @@ func (self *Container) getArguments(method reflect.Value) ([]reflect.Value, erro
 
 		argType := methodType.In(i)
 
-		if argValue, err := self.getValue(argType); err != nil {
+		if argValue, err := self.getValue(argType, stack); err != nil {
 			return nil, fmt.Errorf("Can not inject parameter #%d (type %v): %w", i, argType, err)
 		} else {
 			args[i] = argValue
@@ -304,9 +307,9 @@ func (self *Container) getArguments(method reflect.Value) ([]reflect.Value, erro
 }
 
 // callInjected call the given method, injecting its arguments.
-func (self *Container) callInjected(method reflect.Value) ([]reflect.Value, error) {
+func (self *Container) callInjected(method reflect.Value, stack *componentStack) ([]reflect.Value, error) {
 
-	args, err := self.getArguments(method)
+	args, err := self.getArguments(method, stack)
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +342,7 @@ func (self *Container) CallInjected(method any) error {
 
 	// get arguments
 
-	args, err := self.getArguments(methodValue)
+	args, err := self.getArguments(methodValue, newComponentStack())
 
 	defer func() {
 		for c := len(self.closables) - 1; c >= 0; c-- {
