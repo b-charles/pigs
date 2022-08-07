@@ -1,4 +1,4 @@
-package smartconf
+package smartconfig
 
 import (
 	"fmt"

@@ -85,5 +85,5 @@ The `Configuration` component manages the merging of all sources in this compone
 
 ## And now?
 
-The usage of this module should be efficient but not convenient. The module [smartconf](../smartconf/README.md) can be useful to get a chunck of typed configuration values.
+The usage of this module should be efficient but not convenient. The module [smartconfig](../smartconfig/README.md) can be useful to get a chunck of typed configuration values.
 

@@ -1,4 +1,4 @@
-module github.com/b-charles/pigs/smartconf
+module github.com/b-charles/pigs/smartconfig
 
 go 1.18
 

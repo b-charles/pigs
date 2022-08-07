@@ -1,9 +1,9 @@
-package smartconf_test
+package smartconfig_test
 
 import (
 	"github.com/b-charles/pigs/config"
 	"github.com/b-charles/pigs/ioc"
-	. "github.com/b-charles/pigs/smartconf"
+	. "github.com/b-charles/pigs/smartconfig"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

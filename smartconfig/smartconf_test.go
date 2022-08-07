@@ -1,4 +1,4 @@
-package smartconf_test
+package smartconfig_test
 
 import (
 	"testing"
