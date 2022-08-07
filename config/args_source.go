@@ -8,9 +8,9 @@ import (
 	"github.com/b-charles/pigs/ioc"
 )
 
-var valueRegexp *regexp.Regexp = regexp.MustCompile("^--([^=]+)=(.*)$")
-var valueRegexpSimple *regexp.Regexp = regexp.MustCompile("^--([^=]+)='(.*)'$")
-var valueRegexpDouble *regexp.Regexp = regexp.MustCompile("^--([^=]+)=\"(.*)\"$")
+var valueRegexp *regexp.Regexp = regexp.MustCompile("^--?([^=]+)=(.*)$")
+var valueRegexpSimple *regexp.Regexp = regexp.MustCompile("^--?([^=]+)='(.*)'$")
+var valueRegexpDouble *regexp.Regexp = regexp.MustCompile("^--?([^=]+)=\"(.*)\"$")
 
 func keyvalueArg(arg string) (string, string, bool) {
 
@@ -30,8 +30,8 @@ func keyvalueArg(arg string) (string, string, bool) {
 
 }
 
-var boolRegexp *regexp.Regexp = regexp.MustCompile("^--([^=]+)$")
-var noboolRegexp *regexp.Regexp = regexp.MustCompile("^--no-([^=]+)$")
+var boolRegexp *regexp.Regexp = regexp.MustCompile("^--?([^=]+)$")
+var noboolRegexp *regexp.Regexp = regexp.MustCompile("^--?no-([^=]+)$")
 
 func keyboolArg(arg string) (string, string, bool) {
 

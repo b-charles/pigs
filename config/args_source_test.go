@@ -16,6 +16,16 @@ func parse(args []string) map[string]string {
 
 var _ = Describe("Args", func() {
 
+	It("should parse simple value", func() {
+		source := parse([]string{"--oasis=Wonderwall"})
+		Expect(source).To(HaveKeyWithValue("oasis", "Wonderwall"))
+	})
+
+	It("should parse simple value with one dash", func() {
+		source := parse([]string{"-moriarty=Jimmy"})
+		Expect(source).To(HaveKeyWithValue("moriarty", "Jimmy"))
+	})
+
 	It("should parse value between simple quote", func() {
 		source := parse([]string{"--jamiroquai='Virtual Insanity'"})
 		Expect(source).To(HaveKeyWithValue("jamiroquai", "Virtual Insanity"))

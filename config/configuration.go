@@ -118,11 +118,7 @@ func CreateConfiguration(sources []ConfigSource) (Configuration, error) {
 }
 
 func init() {
-
-	ioc.PutFactory(func(sources []ConfigSource) (Configuration, error) {
-		return CreateConfiguration(sources)
-	})
-
+	ioc.PutFactory(CreateConfiguration)
 }
 
 /*
