@@ -37,16 +37,16 @@ By simply defining a dependency on the config module will defines some default s
 
 This configuration source is used to defined programmatically default values. It's defined with the priority `-999`, in the module `github.com/b-charles/pigs/config/confsources/conf`.
 
-To define a default value, simply use the method `SetDefault` in an init function:
+To define a default value, simply use the method `Set` in an init function:
 ```go
 package mypkg
 
-import "github.com/b-charles/pigs/config/confsources/conf"
+import "github.com/b-charles/pigs/config"
 
 func init() {
 
-  conf.SetDefault("my.little.variable", "Greatest Value Ever!")
-  conf.SetDefault("another.critical.variable", "Foo Bar")
+  config.Set("my.little.variable", "Greatest Value Ever!")
+  config.Set("another.critical.variable", "Foo Bar")
 
 }
 ```
