@@ -157,6 +157,16 @@ func (self *JsonBuilder) SetBool(path string, value bool) *JsonBuilder {
 	return self
 }
 
+func (self *JsonBuilder) SetEmptyObject(path string) *JsonBuilder {
+	self.set(path, newJsonObject())
+	return self
+}
+
+func (self *JsonBuilder) SetEmptyArray(path string) *JsonBuilder {
+	self.set(path, newJsonArray())
+	return self
+}
+
 func (self *JsonBuilder) SetNull(path string) *JsonBuilder {
 	self.set(path, JSON_NULL)
 	return self

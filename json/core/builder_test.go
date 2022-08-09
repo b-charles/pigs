@@ -41,4 +41,15 @@ var _ = Describe("Json builder", func() {
 
 	})
 
+	It("should handle nicely adding empty object on already existing nodes", func() {
+
+		b := NewJsonBuilder()
+		b.SetInt("a.a", 42)
+		b.SetEmptyObject("a")
+		b.SetInt("a.b[0]", 42)
+		b.SetEmptyArray("a.b")
+		Expect(b.Build().String()).To(Equal(`{"a":{"a":42,"b":[42]}}`))
+
+	})
+
 })
