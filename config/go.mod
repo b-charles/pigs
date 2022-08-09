@@ -19,11 +19,3 @@ require (
 )
 
 replace github.com/b-charles/pigs/ioc => ../ioc
-
-replace github.com/b-charles/pigs/config/confsources => ./confsources
-
-replace github.com/b-charles/pigs/config/confsources/args => ./confsources/args
-
-replace github.com/b-charles/pigs/config/confsources/envvar => ./confsources/envvar
-
-replace github.com/b-charles/pigs/config/confsources/programmatic => ./confsources/programmatic
