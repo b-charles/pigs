@@ -78,8 +78,10 @@ func recursiveSet(node JsonNode, parsedPath [][]string, value JsonNode) (JsonNod
 
 				} else {
 
-					if _, err := recursiveSet(sub, parsedPath[1:], value); err != nil {
+					if newMember, err := recursiveSet(sub, parsedPath[1:], value); err != nil {
 						return node, fmt.Errorf("Can not add member '%v': %w", key, err)
+					} else {
+						casted.set(key, newMember)
 					}
 
 				}
@@ -117,8 +119,10 @@ func recursiveSet(node JsonNode, parsedPath [][]string, value JsonNode) (JsonNod
 
 				} else {
 
-					if _, err := recursiveSet(sub, parsedPath[1:], value); err != nil {
+					if newElement, err := recursiveSet(sub, parsedPath[1:], value); err != nil {
 						return node, fmt.Errorf("Can not add member '%v': %w", key, err)
+					} else {
+						casted.set(index, newElement)
 					}
 
 				}

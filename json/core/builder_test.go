@@ -41,14 +41,14 @@ var _ = Describe("Json builder", func() {
 
 	})
 
-	It("should handle nicely adding empty object on already existing nodes", func() {
+	It("should overwrite values", func() {
 
 		b := NewJsonBuilder()
 		b.SetInt("a.a", 42)
-		b.SetEmptyObject("a")
-		b.SetInt("a.b[0]", 42)
-		b.SetEmptyArray("a.b")
-		Expect(b.Build().String()).To(Equal(`{"a":{"a":42,"b":[42]}}`))
+		b.SetBool("a.b[0]", true)
+		b.SetInt("a.a", 45)
+		b.SetBool("a.b[0]", false)
+		Expect(b.Build().String()).To(Equal(`{"a":{"a":45,"b":[false]}}`))
 
 	})
 
