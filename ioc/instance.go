@@ -74,10 +74,10 @@ func (self *instance) postInit(stack *componentStack) error {
 
 	} else if len(out) == 1 {
 
-		if err, ok := out[0].Interface().(error); !ok {
-			return fmt.Errorf("The output of the PostInit method of '%v' should be an error, not a '%v'.", self, out[0].Type())
-		} else if err != nil {
-			return fmt.Errorf("Error returned by PostInit of '%v': %w", self, err)
+		if outType := postInit.Type().Out(0); !outType.AssignableTo(error_type) {
+			return fmt.Errorf("The output of the PostInit method of '%v' should be an error, not a '%v'.", self, outType)
+		} else if err := out[0].Interface(); err != nil {
+			return fmt.Errorf("Error returned by PostInit of '%v': %w", self, err.(error))
 		} else {
 			return nil
 		}
