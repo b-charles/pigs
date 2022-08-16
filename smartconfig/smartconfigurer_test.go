@@ -28,7 +28,8 @@ type parsed_config struct {
 
 type complex_root_config struct {
 	Param1 string
-	Sub    complex_nested_config
+	Sub1   complex_nested_config
+	Sub2   *complex_nested_config
 }
 
 type complex_nested_config struct {
@@ -84,24 +85,31 @@ var _ = Describe("Smart configuration", func() {
 
 		TestConfigure("", &complex_root_config{})
 		config.SetTest(map[string]string{
-			"param1":      "great value",
-			"sub.list.2":  "9",
-			"sub.list.12": "8",
-			"sub.list.a":  "7",
-			"sub.list.b":  "6",
-			"sub.list.c":  "5",
-			"sub.map.yes": "true",
-			"sub.map.no":  "false",
+			"param1":       "great value",
+			"sub1.list.2":  "9",
+			"sub1.list.12": "8",
+			"sub1.list.a":  "7",
+			"sub1.list.b":  "6",
+			"sub1.list.c":  "5",
+			"sub1.map.yes": "true",
+			"sub1.map.no":  "false",
+			"sub2.map.red": "true",
 		})
 
 		ioc.CallInjected(func(injected *complex_root_config) {
 			Expect(injected).To(Equal(&complex_root_config{
 				Param1: "great value",
-				Sub: complex_nested_config{
+				Sub1: complex_nested_config{
 					List: []int{9, 8, 7, 6, 5},
 					Map: map[string]bool{
 						"yes": true,
 						"no":  false,
+					},
+				},
+				Sub2: &complex_nested_config{
+					List: []int{},
+					Map: map[string]bool{
+						"red": true,
 					},
 				},
 			}))

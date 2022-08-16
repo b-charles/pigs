@@ -12,7 +12,7 @@ type SmartConfigurer struct {
 	configurerMap map[reflect.Type]Configurer
 }
 
-func NewSmartConfigurer(config NavConfig, parsers []Parser, configurers []Configurer) (*SmartConfigurer, error) {
+func newSmartConfigurer(config NavConfig, parsers []Parser, configurers []Configurer) (*SmartConfigurer, error) {
 
 	configurerMap := map[reflect.Type]Configurer{}
 
@@ -26,8 +26,7 @@ func NewSmartConfigurer(config NavConfig, parsers []Parser, configurers []Config
 		target := smart.Target()
 
 		if old, pres := configurerMap[target]; pres {
-			return nil, fmt.Errorf("Two configurers '%v' and '%v' are defined to the same target %v.",
-				old, parser, target)
+			return nil, fmt.Errorf("Two configurers '%v' and '%v' are defined to the same target %v.", old, parser, target)
 		}
 
 		configurerMap[target] = smart
@@ -39,8 +38,7 @@ func NewSmartConfigurer(config NavConfig, parsers []Parser, configurers []Config
 		target := configurer.Target()
 
 		if old, pres := configurerMap[target]; pres {
-			return nil, fmt.Errorf("Two configurers '%v' and '%v' are defined to the same target %v.",
-				old, configurer, target)
+			return nil, fmt.Errorf("Two configurers '%v' and '%v' are defined to the same target %v.", old, configurer, target)
 		}
 
 		configurerMap[target] = configurer
@@ -74,46 +72,22 @@ func (self *SmartConfigurer) Configure(root string, configurable any) error {
 
 }
 
-func pointerConfigurer(configurer Configurer) Configurer {
-
-	typ := configurer.Target()
-	target := reflect.PointerTo(typ)
-
-	conf := func(config NavConfig, value reflect.Value) error {
-		return configurer.Configure(config, value.Elem())
-	}
-
-	return &simpleConfigurer{target, conf}
-
-}
-
 func (self *SmartConfigurer) FindConfigurer(target reflect.Type) (Configurer, error) {
 
 	if configurer, present := self.configurerMap[target]; present {
 		return configurer, nil
 	}
 
-	elem := target
 	if target.Kind() == reflect.Pointer {
-		elem = target.Elem()
-	}
-
-	if elem != target {
-		if configurer, present := self.configurerMap[elem]; present {
-			wrapped := pointerConfigurer(configurer)
-			self.configurerMap[target] = wrapped
-			return wrapped, nil
-		}
+		configurer := newPointerConfigurer(target)
+		self.configurerMap[target] = configurer
+		configurer.analyze(self)
+		return configurer, nil
 	}
 
 	if target.Kind() == reflect.Struct {
 		configurer := newStructConfigurer(target)
 		self.configurerMap[target] = configurer
-		configurer.analyze(self)
-		return configurer, nil
-	} else if elem != target && elem.Kind() == reflect.Struct {
-		configurer := newStructConfigurer(elem)
-		self.configurerMap[target] = pointerConfigurer(configurer)
 		configurer.analyze(self)
 		return configurer, nil
 	}
@@ -132,24 +106,12 @@ func (self *SmartConfigurer) FindConfigurer(target reflect.Type) (Configurer, er
 		return configurer, nil
 	}
 
-	for typ, configurer := range self.configurerMap {
-		if typ.AssignableTo(target) {
-			self.configurerMap[target] = configurer
-			return configurer, nil
-		}
-		if elem != target && typ.AssignableTo(elem) {
-			wrapped := pointerConfigurer(configurer)
-			self.configurerMap[target] = wrapped
-			return wrapped, nil
-		}
-	}
-
 	return nil, fmt.Errorf("No configurer found for type %v.", target)
 
 }
 
 func init() {
-	ioc.PutFactory(NewSmartConfigurer)
+	ioc.PutFactory(newSmartConfigurer)
 }
 
 var smartConfigurer_type = reflect.TypeOf(func(*SmartConfigurer) {}).In(0)
@@ -158,15 +120,17 @@ func createConfig(root string, configurable any) any {
 
 	factoryType := reflect.FuncOf(
 		[]reflect.Type{smartConfigurer_type},
-		[]reflect.Type{reflect.TypeOf(configurable)},
+		[]reflect.Type{reflect.TypeOf(configurable), error_type},
 		false)
 
 	factory := reflect.MakeFunc(factoryType, func(args []reflect.Value) []reflect.Value {
 
 		smartConfigurer := args[0].Interface().(*SmartConfigurer)
-		smartConfigurer.Configure(root, configurable)
-
-		return []reflect.Value{reflect.ValueOf(configurable)}
+		if err := smartConfigurer.Configure(root, configurable); err != nil {
+			return []reflect.Value{reflect.ValueOf(configurable), reflect.ValueOf(err)}
+		} else {
+			return []reflect.Value{reflect.ValueOf(configurable), reflect.Zero(error_type)}
+		}
 
 	})
 

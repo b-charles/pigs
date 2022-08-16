@@ -6,6 +6,48 @@ import (
 	"strings"
 )
 
+// Pointer configurer
+
+type pointerConfigurer struct {
+	target     reflect.Type
+	configurer Configurer
+}
+
+func newPointerConfigurer(target reflect.Type) *pointerConfigurer {
+	return &pointerConfigurer{
+		target: target,
+	}
+}
+
+func (self *pointerConfigurer) analyze(smartConfigurer *SmartConfigurer) error {
+
+	if self.target.Kind() != reflect.Pointer {
+		return fmt.Errorf("The target '%v' is not a pointer.", self.target)
+	}
+
+	if configurer, err := smartConfigurer.FindConfigurer(self.target.Elem()); err != nil {
+		return fmt.Errorf("Can not configure to %v: %w", self.target, err)
+	} else {
+		self.configurer = configurer
+		return nil
+	}
+
+}
+
+func (self *pointerConfigurer) Target() reflect.Type {
+	return self.target
+}
+
+func (self *pointerConfigurer) Configure(config NavConfig, receiver reflect.Value) error {
+	ptr := reflect.New(self.target.Elem())
+	if err := self.configurer.Configure(config, ptr.Elem()); err != nil {
+		return err
+	} else {
+		receiver.Set(ptr)
+		return nil
+	}
+}
+
 // Struct configurer
 
 type structConfigurer struct {
