@@ -6,22 +6,25 @@ import (
 )
 
 type JsonObject struct {
-	members map[string]JsonNode
-	sorted  []string
+	members *sortedMap[JsonNode]
 }
 
-func newJsonObject() *JsonObject {
-	return &JsonObject{map[string]JsonNode{}, []string{}}
+func NewJsonObjectSorted(members map[string]JsonNode, sorted []string) *JsonObject {
+	return &JsonObject{newSortedMap(members, sorted)}
 }
 
-var JSON_EMPTY_OBJECT = newJsonObject()
+func NewJsonObject(members map[string]JsonNode) *JsonObject {
 
-func (self *JsonObject) set(key string, elt JsonNode) {
-	if _, p := self.members[key]; !p {
-		self.sorted = append(self.sorted, key)
+	sorted := make([]string, 0, len(members))
+	for k := range members {
+		sorted = append(sorted, k)
 	}
-	self.members[key] = elt
+
+	return &JsonObject{&sortedMap[JsonNode]{members, sorted}}
+
 }
+
+var JSON_EMPTY_OBJECT = &JsonObject{&sortedMap[JsonNode]{map[string]JsonNode{}, []string{}}}
 
 func (self *JsonObject) IsString() bool {
 	return false
@@ -60,11 +63,11 @@ func (self *JsonObject) IsObject() bool {
 }
 
 func (self *JsonObject) GetKeys() []string {
-	return self.sorted
+	return self.members.keys()
 }
 
 func (self *JsonObject) GetMember(key string) JsonNode {
-	if elt, p := self.members[key]; !p {
+	if elt, p := self.members.get(key); !p {
 		return JSON_NULL
 	} else {
 		return elt
@@ -89,22 +92,23 @@ func (self *JsonObject) IsNull() bool {
 
 func (self *JsonObject) String() string {
 
-	if len(self.sorted) == 0 {
+	if self.members.len() == 0 {
 		return "{}"
 	}
 
 	var b strings.Builder
 	fmt.Fprint(&b, "{")
 
-	b.WriteString(formatString(self.sorted[0]))
-	b.WriteRune(':')
-	b.WriteString(self.members[self.sorted[0]].String())
+	for i, k := range self.members.s {
 
-	for _, k := range self.sorted[1:] {
-		b.WriteRune(',')
+		if i > 0 {
+			b.WriteRune(',')
+		}
+
 		b.WriteString(formatString(k))
 		b.WriteRune(':')
-		b.WriteString(self.members[k].String())
+		b.WriteString(self.GetMember(k).String())
+
 	}
 
 	fmt.Fprint(&b, "}")

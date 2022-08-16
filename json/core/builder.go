@@ -1,177 +1,165 @@
 package core
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 )
 
+type jsonBuilderNode struct {
+	value    JsonNode
+	children *sortedMap[*jsonBuilderNode]
+}
+
+func newJsonBuilderNode() *jsonBuilderNode {
+	return &jsonBuilderNode{nil, newEmptySortedMap[*jsonBuilderNode]()}
+}
+
+func (self *jsonBuilderNode) put(path []string, value JsonNode) {
+
+	if len(path) == 0 {
+		self.value = value
+		self.children = newEmptySortedMap[*jsonBuilderNode]()
+	} else {
+
+		self.value = nil
+
+		child, ok := self.children.get(path[0])
+		if !ok {
+			child = newJsonBuilderNode()
+			self.children.put(path[0], child)
+		}
+
+		child.put(path[1:], value)
+
+	}
+
+}
+
+func (self *jsonBuilderNode) json() JsonNode {
+
+	if self.value != nil {
+
+		return self.value
+
+	} else if self.children.len() == 0 {
+
+		return JSON_NULL
+
+	} else if array, parsed, max := self.arrayCheck(); array {
+
+		elements := make([]JsonNode, max+1)
+		for k, e := range self.children.m {
+			elements[parsed[k]] = e.json()
+		}
+
+		return &JsonArray{elements}
+
+	} else {
+
+		n := self.children.len()
+		members := &sortedMap[JsonNode]{make(map[string]JsonNode, n), make([]string, 0, n)}
+		for _, k := range self.children.s {
+			members.put(k, self.children.m[k].json())
+		}
+
+		return &JsonObject{members}
+
+	}
+
+}
+
+func (self *jsonBuilderNode) arrayCheck() (bool, map[string]int, int) {
+
+	parsed := make(map[string]int)
+	max := 0
+
+	for _, k := range self.children.s {
+		if k[0] != '[' {
+			return false, nil, 0
+		} else if v, err := strconv.Atoi(k[1:]); err != nil {
+			return false, nil, 0
+		} else {
+			parsed[k] = v
+			if max < v {
+				max = v
+			}
+		}
+	}
+
+	return true, parsed, max
+
+}
+
 type JsonBuilder struct {
-	root JsonNode
+	root *jsonBuilderNode
 }
 
 func NewJsonBuilder() *JsonBuilder {
-	return &JsonBuilder{JSON_NULL}
+	return &JsonBuilder{newJsonBuilderNode()}
 }
 
 func (self *JsonBuilder) Build() JsonNode {
-	return self.root
+	return self.root.json()
 }
 
-var pathregexp = regexp.MustCompile(`\.?([^.\[]+)|\[(\d+)\]`)
+var pathregexp = regexp.MustCompile(`\.?([^.\[]+)|(\[\d+)\]`)
 
-func getKey(parsedPathPart []string) (bool, string, int) {
-	if parsedPathPart[2] != "" {
-		if index, err := strconv.Atoi(parsedPathPart[2]); err != nil {
-			panic(err)
+func parsePath(path string) []string {
+
+	parsed := pathregexp.FindAllStringSubmatch(path, -1)
+
+	paths := make([]string, 0, len(parsed))
+	for _, p := range parsed {
+		if p[2] != "" {
+			paths = append(paths, p[2])
 		} else {
-			return false, "", index
+			paths = append(paths, p[1])
 		}
-	} else {
-		return true, parsedPathPart[1], 0
 	}
+
+	return paths
+
 }
 
-func (self *JsonBuilder) set(path string, value JsonNode) {
-	parsedPath := pathregexp.FindAllStringSubmatch(path, -1)
-	if newRoot, err := recursiveSet(self.root, parsedPath, value); err != nil {
-		panic(err)
-	} else {
-		self.root = newRoot
-	}
-}
-
-func recursiveSet(node JsonNode, parsedPath [][]string, value JsonNode) (JsonNode, error) {
-
-	if len(parsedPath) == 0 {
-
-		return value, nil
-
-	} else {
-
-		if isObj, key, index := getKey(parsedPath[0]); isObj {
-
-			if node.IsNull() {
-
-				if newValue, err := recursiveSet(JSON_NULL, parsedPath[1:], value); err != nil {
-					return node, fmt.Errorf("Can not add member '%v': %w", key, err)
-				} else {
-					newNode := newJsonObject()
-					newNode.set(key, newValue)
-					return newNode, nil
-				}
-
-			} else if !node.IsObject() {
-
-				return node, fmt.Errorf("Can not add member '%v' in %v.", key, node)
-
-			} else {
-
-				casted := node.(*JsonObject)
-				if sub := casted.GetMember(key); sub.IsNull() {
-
-					if newMember, err := recursiveSet(JSON_NULL, parsedPath[1:], value); err != nil {
-						return node, fmt.Errorf("Can not add member '%v': %w", key, err)
-					} else {
-						casted.set(key, newMember)
-					}
-
-				} else {
-
-					if newMember, err := recursiveSet(sub, parsedPath[1:], value); err != nil {
-						return node, fmt.Errorf("Can not add member '%v': %w", key, err)
-					} else {
-						casted.set(key, newMember)
-					}
-
-				}
-
-				return node, nil
-
-			}
-
-		} else {
-
-			if node.IsNull() {
-
-				if newValue, err := recursiveSet(JSON_NULL, parsedPath[1:], value); err != nil {
-					return node, fmt.Errorf("Can not add element at %v: %w", index, err)
-				} else {
-					newNode := newJsonArray()
-					newNode.set(index, newValue)
-					return newNode, nil
-				}
-
-			} else if !node.IsArray() {
-
-				return node, fmt.Errorf("Can not add element at %v in %v.", index, node)
-
-			} else {
-
-				casted := node.(*JsonArray)
-				if sub := casted.GetElement(index); sub.IsNull() {
-
-					if newElement, err := recursiveSet(JSON_NULL, parsedPath[1:], value); err != nil {
-						return node, fmt.Errorf("Can not add element at %v: %w", key, err)
-					} else {
-						casted.set(index, newElement)
-					}
-
-				} else {
-
-					if newElement, err := recursiveSet(sub, parsedPath[1:], value); err != nil {
-						return node, fmt.Errorf("Can not add member '%v': %w", key, err)
-					} else {
-						casted.set(index, newElement)
-					}
-
-				}
-
-				return node, nil
-
-			}
-
-		}
-
-	}
-
+func (self *JsonBuilder) Set(path string, value JsonNode) {
+	self.root.put(parsePath(path), value)
 }
 
 func (self *JsonBuilder) SetString(path string, value string) *JsonBuilder {
-	self.set(path, JsonString(value))
+	self.Set(path, JsonString(value))
 	return self
 }
 
 func (self *JsonBuilder) SetFloat(path string, value float64) *JsonBuilder {
-	self.set(path, JsonFloat(value))
+	self.Set(path, JsonFloat(value))
 	return self
 }
 
 func (self *JsonBuilder) SetInt(path string, value int) *JsonBuilder {
-	self.set(path, JsonInt(value))
+	self.Set(path, JsonInt(value))
 	return self
 }
 
 func (self *JsonBuilder) SetBool(path string, value bool) *JsonBuilder {
 	if value {
-		self.set(path, JSON_TRUE)
+		self.Set(path, JSON_TRUE)
 	} else {
-		self.set(path, JSON_FALSE)
+		self.Set(path, JSON_FALSE)
 	}
 	return self
 }
 
 func (self *JsonBuilder) SetEmptyObject(path string) *JsonBuilder {
-	self.set(path, newJsonObject())
+	self.Set(path, JSON_EMPTY_OBJECT)
 	return self
 }
 
 func (self *JsonBuilder) SetEmptyArray(path string) *JsonBuilder {
-	self.set(path, newJsonArray())
+	self.Set(path, JSON_EMPTY_ARRAY)
 	return self
 }
 
 func (self *JsonBuilder) SetNull(path string) *JsonBuilder {
-	self.set(path, JSON_NULL)
+	self.Set(path, JSON_NULL)
 	return self
 }

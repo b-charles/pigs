@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	"math"
 	"strings"
 )
 
@@ -10,42 +9,11 @@ type JsonArray struct {
 	elements []JsonNode
 }
 
-func newJsonArray() *JsonArray {
-	return &JsonArray{make([]JsonNode, 0, 10)}
+func NewJsonArray(elements []JsonNode) *JsonArray {
+	return &JsonArray{elements}
 }
 
-var JSON_EMPTY_ARRAY = newJsonArray()
-
-func (self *JsonArray) set(i int, elt JsonNode) {
-
-	if i < 0 {
-		panic(fmt.Errorf("Invalid argument: index %d must not be negative.", i))
-	}
-
-	if cap(self.elements) <= i {
-
-		c := int(math.Exp2(math.Ceil(math.Log2(float64(i + 1)))))
-		l := int(math.Max(float64(len(self.elements)), float64(i+1)))
-
-		newSlice := make([]JsonNode, l, c)
-		for i, e := range self.elements {
-			newSlice[i] = e
-		}
-		self.elements = newSlice
-
-	}
-
-	if len(self.elements) <= i {
-		self.elements = self.elements[:i+1]
-	}
-
-	self.elements[i] = elt
-
-}
-
-func (self *JsonArray) append(elt JsonNode) {
-	self.elements = append(self.elements, elt)
-}
+var JSON_EMPTY_ARRAY = &JsonArray{[]JsonNode{}}
 
 func (self *JsonArray) IsString() bool {
 	return false
@@ -116,7 +84,7 @@ func (self *JsonArray) IsNull() bool {
 
 func (self *JsonArray) String() string {
 
-	l := self.GetLen()
+	l := len(self.elements)
 	if l == 0 {
 		return "[]"
 	}

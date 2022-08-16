@@ -388,7 +388,7 @@ func (self *jsonParser) readObject() (JsonNode, error) {
 		return JSON_NULL, err
 	}
 
-	node := newJsonObject()
+	members := newEmptySortedMap[JsonNode]()
 
 	self.skipWS()
 
@@ -414,7 +414,7 @@ func (self *jsonParser) readObject() (JsonNode, error) {
 			return JSON_NULL, err
 		}
 
-		node.set(key, value)
+		members.put(key, value)
 
 		self.skipWS()
 
@@ -427,7 +427,7 @@ func (self *jsonParser) readObject() (JsonNode, error) {
 
 	}
 
-	return node, nil
+	return &JsonObject{members}, nil
 
 }
 
@@ -447,7 +447,7 @@ func (self *jsonParser) readArray() (JsonNode, error) {
 		return JSON_NULL, err
 	}
 
-	node := newJsonArray()
+	elements := make([]JsonNode, 0, 10)
 
 	self.skipWS()
 
@@ -459,7 +459,7 @@ func (self *jsonParser) readArray() (JsonNode, error) {
 			return JSON_NULL, err
 		}
 
-		node.append(value)
+		elements = append(elements, value)
 
 		self.skipWS()
 
@@ -472,7 +472,7 @@ func (self *jsonParser) readArray() (JsonNode, error) {
 
 	}
 
-	return node, nil
+	return &JsonArray{elements}, nil
 
 }
 

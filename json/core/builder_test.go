@@ -8,7 +8,7 @@ import (
 
 var _ = Describe("Json builder", func() {
 
-	It("should be able to build null", func() {
+	It("should be able to build empty object", func() {
 
 		b := NewJsonBuilder()
 		Expect(b.Build().String()).To(Equal("null"))
