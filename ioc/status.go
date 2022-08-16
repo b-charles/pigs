@@ -91,7 +91,7 @@ func sortComponentsRecords(slice []ComponentRecords) {
 type InstanceRecords struct {
 	Core     bool
 	Type     reflect.Type
-	String   string
+	Instance any
 	Closable bool
 }
 
@@ -120,7 +120,7 @@ func (self InstanceRecords) write(builder *strings.Builder) {
 		builder.WriteString(")")
 	}
 	builder.WriteString(": ")
-	builder.WriteString(self.String)
+	builder.WriteString(fmt.Sprintf("%v", self.Instance))
 	builder.WriteString("\n")
 
 }
@@ -193,17 +193,15 @@ func (self *ContainerStatus) update() {
 	self.Instances = make([]InstanceRecords, 0, len(self.container.instances))
 	for comp, inst := range self.container.instances {
 
-		var str string
-		if inst.value.Interface() == self {
-			str = "<Container status>"
-		} else {
-			str = inst.String()
+		value := inst.value.Interface()
+		if value == self {
+			value = "<Container status>"
 		}
 
 		self.Instances = append(self.Instances, InstanceRecords{
 			Core:     comp.scope == core,
 			Type:     comp.main,
-			String:   str,
+			Instance: value,
 			Closable: inst.isClosable(),
 		})
 
