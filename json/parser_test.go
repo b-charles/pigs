@@ -1,9 +1,9 @@
-package core_test
+package json_test
 
 import (
 	"strconv"
 
-	. "github.com/b-charles/pigs/json/core"
+	. "github.com/b-charles/pigs/json"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

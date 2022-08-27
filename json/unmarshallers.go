@@ -5,14 +5,13 @@ import (
 	"reflect"
 
 	"github.com/b-charles/pigs/ioc"
-	"github.com/b-charles/pigs/json/core"
 )
 
 // Defaults unmarshallers
 
 func init() {
 
-	ioc.Put(func(json core.JsonNode) (string, error) {
+	ioc.Put(func(json JsonNode) (string, error) {
 		if json.IsNull() {
 			return "", nil
 		} else if !json.IsString() {
@@ -22,7 +21,7 @@ func init() {
 		}
 	}, func(JsonUnmarshaller) {})
 
-	ioc.Put(func(json core.JsonNode) (float64, error) {
+	ioc.Put(func(json JsonNode) (float64, error) {
 		if json.IsNull() {
 			return 0, nil
 		} else if !json.IsFloat() {
@@ -32,7 +31,7 @@ func init() {
 		}
 	}, func(JsonUnmarshaller) {})
 
-	ioc.Put(func(json core.JsonNode) (int, error) {
+	ioc.Put(func(json JsonNode) (int, error) {
 		if json.IsNull() {
 			return 0, nil
 		} else if !json.IsInt() {
@@ -42,7 +41,7 @@ func init() {
 		}
 	}, func(JsonUnmarshaller) {})
 
-	ioc.Put(func(json core.JsonNode) (bool, error) {
+	ioc.Put(func(json JsonNode) (bool, error) {
 		if json.IsNull() {
 			return false, nil
 		} else if !json.IsBool() {
@@ -65,7 +64,7 @@ func newPointerUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmars
 	if unmarshaller, err := mapper.getUnmarshaller(target.Elem()); err != nil {
 		return fmt.Errorf("Can not unmarshal %v to json: %w", target, err)
 	} else {
-		valueUnmarshaller.f = func(json core.JsonNode) (reflect.Value, error) {
+		valueUnmarshaller.f = func(json JsonNode) (reflect.Value, error) {
 			if json.IsNull() {
 				return reflect.Zero(target), nil
 			} else if v, err := unmarshaller.f(json); err != nil {
@@ -87,7 +86,7 @@ func newStructUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarsh
 		return fmt.Errorf("The target %v is not a struct.", target)
 	}
 
-	fieldsUnmarshallers := make([]func(core.JsonNode, reflect.Value) error, 0, target.NumField())
+	fieldsUnmarshallers := make([]func(JsonNode, reflect.Value) error, 0, target.NumField())
 	for f := 0; f < target.NumField(); f++ {
 
 		field := target.Field(f)
@@ -104,7 +103,7 @@ func newStructUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarsh
 			return fmt.Errorf("Can not unmarshal field %v of %v to json: %w", field.Name, target, err)
 		} else {
 			numField := f
-			fieldsUnmarshallers = append(fieldsUnmarshallers, func(json core.JsonNode, value reflect.Value) error {
+			fieldsUnmarshallers = append(fieldsUnmarshallers, func(json JsonNode, value reflect.Value) error {
 				if v, err := unmarshaller.f(json.GetMember(key)); err != nil {
 					return fmt.Errorf("Can't unmarshall field %v: %w", key, err)
 				} else {
@@ -116,7 +115,7 @@ func newStructUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarsh
 
 	}
 
-	valueUnmarshaller.f = func(json core.JsonNode) (reflect.Value, error) {
+	valueUnmarshaller.f = func(json JsonNode) (reflect.Value, error) {
 
 		value := reflect.New(target).Elem()
 
@@ -150,7 +149,7 @@ func newSliceUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarsha
 		return fmt.Errorf("Can not unmarshal %v to json: %w", target, err)
 	} else {
 
-		valueUnmarshaller.f = func(json core.JsonNode) (reflect.Value, error) {
+		valueUnmarshaller.f = func(json JsonNode) (reflect.Value, error) {
 
 			if json.IsNull() {
 				return reflect.Zero(target), nil
@@ -191,7 +190,7 @@ func newMapUnMarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarshall
 		return fmt.Errorf("Can not unmarshal %v to json: %w", target, err)
 	} else {
 
-		valueUnmarshaller.f = func(json core.JsonNode) (reflect.Value, error) {
+		valueUnmarshaller.f = func(json JsonNode) (reflect.Value, error) {
 
 			if json.IsNull() {
 				return reflect.Zero(target), nil

@@ -1,4 +1,4 @@
-package core
+package json
 
 type JsonNode interface {
 	IsString() bool

@@ -3,15 +3,13 @@ package json
 import (
 	"fmt"
 	"reflect"
-
-	"github.com/b-charles/pigs/json/core"
 )
 
-// type JsonMarshaller func(T) (core.JsonNode, error)
+// type JsonMarshaller func(T) (JsonNode, error)
 type JsonMarshaller any
 
 type jsonValueMarshaller struct {
-	f func(reflect.Value) (core.JsonNode, error)
+	f func(reflect.Value) (JsonNode, error)
 }
 
 func valueMarshaller(marshaller JsonMarshaller) (reflect.Type, *jsonValueMarshaller, error) {
@@ -22,17 +20,17 @@ func valueMarshaller(marshaller JsonMarshaller) (reflect.Type, *jsonValueMarshal
 	if t.Kind() != reflect.Func {
 		return nil, nil, fmt.Errorf("Invalid marshaller: %v is not a function.", v)
 	} else if t.NumIn() != 1 {
-		return nil, nil, fmt.Errorf("Invalid marshaller (wrong inputs): %v, expected func(T) (core.JsonNode, error)", t)
+		return nil, nil, fmt.Errorf("Invalid marshaller (wrong inputs): %v, expected func(T) (JsonNode, error)", t)
 	} else if t.NumOut() != 2 || t.Out(0) != jsonType || !t.Out(1).AssignableTo(errorType) {
-		return nil, nil, fmt.Errorf("Invalid marshaller (wrong outputs): %v, expected func(T) (core.JsonNode, error)", t)
+		return nil, nil, fmt.Errorf("Invalid marshaller (wrong outputs): %v, expected func(T) (JsonNode, error)", t)
 	}
 
-	f := func(value reflect.Value) (core.JsonNode, error) {
+	f := func(value reflect.Value) (JsonNode, error) {
 		outs := v.Call([]reflect.Value{value})
 		if err := outs[1].Interface(); err != nil {
-			return outs[0].Interface().(core.JsonNode), err.(error)
+			return outs[0].Interface().(JsonNode), err.(error)
 		} else {
-			return outs[0].Interface().(core.JsonNode), nil
+			return outs[0].Interface().(JsonNode), nil
 		}
 	}
 

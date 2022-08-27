@@ -7,17 +7,16 @@ import (
 	"strings"
 
 	"github.com/b-charles/pigs/ioc"
-	"github.com/b-charles/pigs/json/core"
 )
 
 var errorType = reflect.TypeOf(func(error) {}).In(0)
 var stringType = reflect.TypeOf(func(string) {}).In(0)
-var jsonType = reflect.TypeOf(func(core.JsonNode) {}).In(0)
+var jsonType = reflect.TypeOf(func(JsonNode) {}).In(0)
 
 type Json interface {
-	Marshal(any) (core.JsonNode, error)
+	Marshal(any) (JsonNode, error)
 	MarshalToString(any) (string, error)
-	Unmarshal(json core.JsonNode, callback any) error
+	Unmarshal(json JsonNode, callback any) error
 	UnmarshalFromString(json string, callback any) error
 }
 
@@ -176,14 +175,14 @@ func (self *JsonMapper) getMarshaller(target reflect.Type) (*jsonValueMarshaller
 
 }
 
-func (self *JsonMapper) Marshal(value any) (core.JsonNode, error) {
+func (self *JsonMapper) Marshal(value any) (JsonNode, error) {
 
 	target := reflect.TypeOf(value)
 
 	if marshaller, err := self.getMarshaller(target); err != nil {
-		return core.JSON_NULL, err
+		return JSON_NULL, err
 	} else if json, err := marshaller.f(reflect.ValueOf(value)); err != nil {
-		return core.JSON_NULL, err
+		return JSON_NULL, err
 	} else {
 		return json, nil
 	}
@@ -252,7 +251,7 @@ func (self *JsonMapper) getUnmarshaller(target reflect.Type) (*jsonValueUnmarsha
 
 }
 
-func (self *JsonMapper) Unmarshal(json core.JsonNode, callback any) error {
+func (self *JsonMapper) Unmarshal(json JsonNode, callback any) error {
 
 	t := reflect.TypeOf(callback)
 	if t.Kind() != reflect.Func {
@@ -275,7 +274,7 @@ func (self *JsonMapper) Unmarshal(json core.JsonNode, callback any) error {
 }
 
 func (self *JsonMapper) UnmarshalFromString(str string, callback any) error {
-	if json, err := core.ParseString(str); err != nil {
+	if json, err := ParseString(str); err != nil {
 		return err
 	} else {
 		return self.Unmarshal(json, callback)
