@@ -1,6 +1,7 @@
 package json
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strconv"
@@ -69,6 +70,14 @@ func ParseString(source string) (JsonNode, error) {
 
 func ParseAllString(source string) ([]JsonNode, error) {
 	return ParseAll(strings.NewReader(source))
+}
+
+func ParseBytes(source []byte) (JsonNode, error) {
+	return Parse(bytes.NewReader(source))
+}
+
+func ParseAllBytes(source []byte) ([]JsonNode, error) {
+	return ParseAll(bytes.NewReader(source))
 }
 
 func (self *jsonParser) wrapError(err error) error {
