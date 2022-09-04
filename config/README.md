@@ -72,6 +72,10 @@ Arguments can be in one of theses format (with `[name]` the name of the variable
 * `--[name]` for boolean value, which will be associated with the value `true`
 * `--no-[name]` for boolean value, which will be associated with the value `false`.
 
+#### Json files
+
+Files formatted in Json can be processed and included in the final configuration. The process is defined with the priority `200`. Any configuration key previously defined starting with `config.json` and corresponding to an existing file will be loaded, parsed and integrated in the configuration. The path separator should always be `/` and the path can be absolute (starting with an `/`) or relative to the working directory. The key `config.json` itself is defined with `application.json`.
+
 ### The `Configuration`
 
 The `Configuration` component manages the merging of all sources in this component, and resolve placeholders: for each value, each occurance of the pattern `${<myvalue>}` is replaced with the value of `<myvalue>`. So, if a config source defines a value `name` with `Batman` and another value `whoami` with `I'm ${name}`, the resolving process will convert `whoami` to `I'm Batman`. Placeholders can be chained and nested:

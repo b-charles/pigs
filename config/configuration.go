@@ -49,8 +49,7 @@ func (self MutableConfig) Get(key string) (string, error) {
 }
 
 func (self MutableConfig) Lookup(key string) (string, bool, error) {
-	_, p := self[key]
-	if p {
+	if _, p := self[key]; p {
 		v, e := resolveValue(self, key, map[string]bool{}, false)
 		return v, true, e
 	} else {
