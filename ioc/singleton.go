@@ -17,6 +17,18 @@ func ContainerInstance() *Container {
 	return containerInstance
 }
 
+// ErroneousDefaultPutFactory records a default component defined by a factory and
+// optional signatures and returns an error if something wrong happened.
+func ErroneousDefaultPutFactory(factory any, signFuncs ...any) error {
+	return ContainerInstance().DefaultPutFactory(factory, signFuncs...)
+}
+
+// ErroneousDefaultPut records directly a default component with optional signatures
+// and returns an error if something wrong happened.
+func ErroneousDefaultPut(object any, signFuncs ...any) error {
+	return ContainerInstance().DefaultPut(object, signFuncs...)
+}
+
 // ErroneousPutFactory records a component defined by a factory and optional
 // signatures and returns an error if something wrong happened.
 func ErroneousPutFactory(factory any, signFuncs ...any) error {
@@ -45,6 +57,24 @@ func ErroneousTestPut(object any, signFuncs ...any) error {
 // returns an error if something wrong happened.
 func ErroneousCallInjected(method any) error {
 	return ContainerInstance().CallInjected(method)
+}
+
+// DefaultPutFactory records a default component defined by a factory and optional
+// signatures. Panics if something wrong happened.
+func DefaultPutFactory(factory any, signFuncs ...any) {
+	err := ErroneousDefaultPutFactory(factory, signFuncs...)
+	if err != nil {
+		panic(err)
+	}
+}
+
+// DefaultPut records directly a default component with optional signatures. Panics
+// if something wrong happened.
+func DefaultPut(object any, signFuncs ...any) {
+	err := ErroneousDefaultPut(object, signFuncs...)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // PutFactory records a component defined by a factory and optional

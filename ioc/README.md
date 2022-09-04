@@ -74,13 +74,15 @@ var injected *MyInjectedStruct = &MyInjectedStruct{}
 ```
 Here, if `injected` is injected by the container, the field `AllComponents` will contains every components defined with the type or signature `SomeInterface`. If no component are found, the injected slice is empty.
 
-#### Testing
+#### Scopes: Default and Testing
 
-Like it's said in the main goals of the framework, there is no concept of scope, or at least not extendable scope. In fact, the container is divided in two set of components: one for the core components, and one for tests. Every time an injection is proceeded, the container start by searching any component in the test set. If nothing is found, then the container use the core set. In case of auto-discovery injection (slice), if at least one matching component is found in the test set, that components are injected and the components in the core set are not used (which means you can not run a test with an auto-discovered slice empty when it is not outside of testing).
+Like it's said in the main goals of the framework, there is no concept of scope, or at least not extendable scope. In fact, the container is divided in three set of components: one for the default components, one for the core components, and one for tests. Every time an injection is proceeded, the container start by searching any component in the test set. If nothing is found, then the container use the core set. If still nothing is found, then the container use the default set. In case of auto-discovery injection (slice), if at least one matching component is found in the test set, that components are injected and the components in the core set are not used (which means you can not run a test with an auto-discovered slice empty when it is not outside of testing), and in the same spirit, if the core set is used and at least one component is found, the default set is ignored.
 
-The API is defined to record a component in the core set or in the test set. With that mechanisms, it's easy to define clean unit test that mock some components and limit each test to a part of the application (not the entire application, but not only one component neither).
+The API is defined to record a component in the default set, the core set or in the test set. With that mechanisms, it's easy to:
+ * write some libraries with default fonctionnalities which can be overloaded by the main application,
+ * define clean unit test that mock some components and limit each test to a part of the application (not the entire application, but not only one component neither).
 
-Last little trick: you can promote a core component as a test component. If during the instanciation of a test component by a factory (a function which returns the component), a component of the same type produced by the factory is required, the container doesn't throw a cyclic dependency error (as it should) but search if a core component can be used. This mechanism can be usefull to define quickly one composant which will be injected in a slice by auto-discovery, or to configure a component for a test environment.
+Last little trick: you can promote a component to a "superior" scope (a default component to a core or a test component, or a core component as a test component). If during the instanciation of a test component by a factory (a function which returns the component), a component of the same type produced by the factory is required, the container doesn't throw a cyclic dependency error (as it should) but search if a core or a default component can be used. In the same way, if a core component factory requires a component of the same type, the container search if a default component can be used. This mechanism can be usefull to define quickly one composant which will be injected in a slice by auto-discovery, or to configure a component for a test environment.
 
 ### Container and components lifecycles
 
@@ -155,9 +157,9 @@ func init() {
 
 Factories can not define cyclic dependencies (i.e. a factory produces a component `A` which is needed to another factory to create a component `B` which should be injected in the factory of `A`). To resolve the problem, you have to break the cycle, or wait another step in the component's lifecycle (like [Injection](#injection) or [Post-Initialization](#post-initialization)) to inject the required component.
 
-Like explain in the section [Testing](#testing), the functions `Put` and `PutFactory` define the component in the core set. The functions `TestPut` and `TestPutFactory` can be used in the same way to define a component in the test set.
+Like explain in the section [Scopes: Default and Testing](#scopes-default-and-testing), the functions `Put` and `PutFactory` define the component in the core set. The functions `DefaultPut` and `DefaultPutFactory` can be used in the same way to define a component in the default set, and the functions `TestPut` and `TestPutFactory` for the test set.
 
-Finaly, all this method have their `Erroneous*` prefixed version (e.g. `ErroneousTestPut`) which doesn't panic but returns an error if something wrong happened.
+Finaly, all this methods have their `Erroneous*` prefixed version (e.g. `ErroneousTestPut`) which doesn't panic but returns an error if something wrong happened.
 
 ### Exploitation
 
@@ -213,7 +215,7 @@ After the main function executed, the container will close automatically every c
 
 ### Redefinition
 
-It should be only one call of `CallInjected` during the run of the application or at each unit test: after a call of `CallInjected`, every instances are released along the core component definitions if no test component are found. Otherwise, if at least one component is defined in the test scope, instances and only test component definitions are released.
+It should be only one call of `CallInjected` during the run of the application or at each unit test: after a call of `CallInjected`, every instances are released along the component definitions (default and core) if no test components are found. Otherwise, if at least one component is defined in the test scope, instances and only test component definitions are released.
 
 So, if you are running unit tests, you have to defined some fixture to redefined each time all the test components you want to use, and for each test, every component is re-instanced. Be sure to define at least one component in the test scope (even if it is not used and not instanciated) before each call of `CallInjected` or you will loosing the definitions of all the core components.
 

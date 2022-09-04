@@ -10,30 +10,33 @@ import (
 type scope uint
 
 const (
-	core scope = iota
+	def scope = iota
+	core
 	test
 )
 
 // A Container is a set of components. It manages the lifecycle of each
 // component and take in charge the injection process.
 type Container struct {
-	coreComponents map[reflect.Type][]*component
-	testComponents map[reflect.Type][]*component
-	creationTime   time.Time
-	instances      map[*component]*instance
-	closables      []*instance
-	status         *component
+	defaultComponents map[reflect.Type][]*component
+	coreComponents    map[reflect.Type][]*component
+	testComponents    map[reflect.Type][]*component
+	creationTime      time.Time
+	instances         map[*component]*instance
+	closables         []*instance
+	status            *component
 }
 
 // NewContainer creates a new Container.
 func NewContainer() *Container {
 
 	container := &Container{
-		coreComponents: make(map[reflect.Type][]*component),
-		testComponents: make(map[reflect.Type][]*component),
-		creationTime:   time.Now(),
-		instances:      map[*component]*instance{},
-		closables:      []*instance{}}
+		defaultComponents: make(map[reflect.Type][]*component),
+		coreComponents:    make(map[reflect.Type][]*component),
+		testComponents:    make(map[reflect.Type][]*component),
+		creationTime:      time.Now(),
+		instances:         map[*component]*instance{},
+		closables:         []*instance{}}
 
 	container.PutFactory(func() (*Container, error) {
 		return container, nil
@@ -99,6 +102,17 @@ func wrap(component any) reflect.Value {
 
 }
 
+// DefaultPutFactory records a default component defined by a factory and
+// optional signatures.
+func (self *Container) DefaultPutFactory(factory any, signFuncs ...any) error {
+	return self.putIn(reflect.ValueOf(factory), signFuncs, def)
+}
+
+// DefaultPut records directly a default component with optional signatures.
+func (self *Container) DefaultPut(component any, signFuncs ...any) error {
+	return self.putIn(wrap(component), signFuncs, def)
+}
+
 // PutFactory records a component defined by a factory and optional
 // signatures.
 func (self *Container) PutFactory(factory any, signFuncs ...any) error {
@@ -158,6 +172,8 @@ func (self *Container) instanciates(component *component, stack *componentStack)
 func (self *Container) getComponentMap(scope scope) map[reflect.Type][]*component {
 	if scope == core {
 		return self.coreComponents
+	} else if scope == def {
+		return self.defaultComponents
 	} else if scope == test {
 		return self.testComponents
 	} else {
@@ -179,16 +195,23 @@ func (self *Container) getInstances(typ reflect.Type, stack *componentStack) ([]
 
 			if instance, err := self.instanciates(component, stack); err != nil {
 
-				// try core if direct cyclic dependency
-				if cyclic, ok := err.(*cyclicError); ok && len(cyclic.components) == 1 {
+				// try core and default if direct cyclic dependency
+				if isDirectCyclicError(err) {
+
 					if list, ok := self.coreComponents[typ]; ok && len(list) == 1 {
-						if coreInstance, coreErr := self.instanciates(list[0], stack); coreErr != nil {
-							return nil, err
-						} else {
+						if coreInstance, coreErr := self.instanciates(list[0], stack); coreErr == nil {
 							instances = append(instances, coreInstance)
 							continue
 						}
 					}
+
+					if list, ok := self.defaultComponents[typ]; ok && len(list) == 1 {
+						if defaultInstance, defaultErr := self.instanciates(list[0], stack); defaultErr == nil {
+							instances = append(instances, defaultInstance)
+							continue
+						}
+					}
+
 				}
 
 				return nil, err
@@ -214,6 +237,42 @@ func (self *Container) getInstances(typ reflect.Type, stack *componentStack) ([]
 		for _, component := range list {
 
 			if instance, err := self.instanciates(component, stack); err != nil {
+
+				// try default if direct cyclic dependency
+				if isDirectCyclicError(err) {
+
+					if list, ok := self.defaultComponents[typ]; ok && len(list) == 1 {
+						if defaultInstance, defaultErr := self.instanciates(list[0], stack); defaultErr == nil {
+							instances = append(instances, defaultInstance)
+							continue
+						}
+					}
+
+				}
+
+				return nil, err
+
+			} else {
+
+				instances = append(instances, instance)
+
+			}
+
+		}
+
+		return instances, nil
+
+	}
+
+	// default
+
+	if list, ok := self.defaultComponents[typ]; ok {
+
+		instances := make([]*instance, 0, len(list))
+
+		for _, component := range list {
+
+			if instance, err := self.instanciates(component, stack); err != nil {
 				return nil, err
 			} else {
 				instances = append(instances, instance)
@@ -223,11 +282,9 @@ func (self *Container) getInstances(typ reflect.Type, stack *componentStack) ([]
 
 		return instances, nil
 
-	} else {
-
-		return []*instance{}, nil
-
 	}
+
+	return []*instance{}, nil
 
 }
 
@@ -380,6 +437,7 @@ func (self *Container) CallInjected(method any) error {
 	self.instances = make(map[*component]*instance)
 
 	if len(self.testComponents) == 0 {
+		self.defaultComponents = map[reflect.Type][]*component{}
 		self.coreComponents = map[reflect.Type][]*component{}
 	} else {
 		self.testComponents = map[reflect.Type][]*component{}

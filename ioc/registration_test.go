@@ -14,6 +14,38 @@ var _ = Describe("IOC registration", func() {
 		container = NewContainer()
 	})
 
+	Describe("with default factory", func() {
+
+		It("should register", func() {
+			Expect(container.DefaultPutFactory(SimpleFactory("A"))).To(Succeed())
+		})
+
+		It("should register with signatures", func() {
+			Expect(container.DefaultPutFactory(SimpleFactory("A"), func(Doer, BigDoer) {})).To(Succeed())
+		})
+
+		It("should not register with incorrect signature", func() {
+			Expect(container.DefaultPutFactory(SimpleFactory("A"), func(NotDoer) {})).To(HaveOccurred())
+		})
+
+	})
+
+	Describe("with instanciated default component", func() {
+
+		It("should register", func() {
+			Expect(container.DefaultPut(&Simple{"A"})).To(Succeed())
+		})
+
+		It("should register with signatures", func() {
+			Expect(container.DefaultPut(&Simple{"A"}, func(Doer, BigDoer) {})).To(Succeed())
+		})
+
+		It("should not register with incorrect signature", func() {
+			Expect(container.DefaultPut(&Simple{"A"}, func(NotDoer) {})).To(HaveOccurred())
+		})
+
+	})
+
 	Describe("with factory", func() {
 
 		It("should register", func() {

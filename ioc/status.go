@@ -89,7 +89,7 @@ func sortComponentsRecords(slice []ComponentRecords) {
 // Instance wrapper
 
 type InstanceRecords struct {
-	Core     bool
+	Scope    scope
 	Type     reflect.Type
 	Instance any
 	Closable bool
@@ -97,13 +97,19 @@ type InstanceRecords struct {
 
 func (self InstanceRecords) write(builder *strings.Builder) {
 
-	if self.Core {
+	if self.Scope == core {
 		builder.WriteString("[")
 		builder.WriteString(colorCyan)
 		builder.WriteString("Core")
 		builder.WriteString(colorReset)
 		builder.WriteString("] ")
-	} else {
+	} else if self.Scope == def {
+		builder.WriteString("[")
+		builder.WriteString(colorYellow)
+		builder.WriteString("Def")
+		builder.WriteString(colorReset)
+		builder.WriteString("]  ")
+	} else { // scope == test
 		builder.WriteString("[")
 		builder.WriteString(colorPurple)
 		builder.WriteString("Test")
@@ -129,6 +135,7 @@ func (self InstanceRecords) write(builder *strings.Builder) {
 
 type ContainerStatus struct {
 	container *Container
+	Default   []ComponentRecords
 	Core      []ComponentRecords
 	Test      []ComponentRecords
 	Instances []InstanceRecords
@@ -137,6 +144,35 @@ type ContainerStatus struct {
 var containerStatus_type reflect.Type = reflect.TypeOf(&ContainerStatus{})
 
 func (self *ContainerStatus) update() {
+
+	// Default
+
+	self.Default = make([]ComponentRecords, 0, len(self.container.defaultComponents))
+	for typ, comps := range self.container.defaultComponents {
+
+		from := make([]reflect.Type, 0, len(comps))
+		for _, comp := range comps {
+			from = append(from, comp.main)
+		}
+		sort.Slice(from, func(i, j int) bool {
+			return typeLess(from[i], from[j])
+		})
+
+		_, over := self.container.coreComponents[typ]
+		if !over {
+			_, over = self.container.testComponents[typ]
+		}
+
+		self.Default = append(self.Default, ComponentRecords{
+			Type:       typ,
+			From:       from,
+			Overloaded: over,
+		})
+
+	}
+	sort.Slice(self.Default, func(i, j int) bool {
+		return typeLess(self.Default[i].Type, self.Default[j].Type)
+	})
 
 	// Core
 
@@ -199,7 +235,7 @@ func (self *ContainerStatus) update() {
 		}
 
 		self.Instances = append(self.Instances, InstanceRecords{
-			Core:     comp.scope == core,
+			Scope:    comp.scope,
 			Type:     comp.main,
 			Instance: value,
 			Closable: inst.isClosable(),
@@ -221,6 +257,17 @@ func (self *ContainerStatus) String() string {
 	builder.WriteString(colorRed)
 	builder.WriteString("------------------\n")
 	builder.WriteString(colorReset)
+
+	builder.WriteString("\n")
+	builder.WriteString(colorGreen)
+	builder.WriteString("###")
+	builder.WriteString(colorReset)
+	builder.WriteString(" Default components (")
+	builder.WriteString(fmt.Sprintf("%d", len(self.Default)))
+	builder.WriteString(")\n")
+	for _, def := range self.Default {
+		def.write(&builder)
+	}
 
 	builder.WriteString("\n")
 	builder.WriteString(colorGreen)

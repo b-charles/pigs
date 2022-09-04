@@ -89,6 +89,33 @@ var _ = Describe("IOC call", func() {
 
 		})
 
+		It("should inject default component if nothing is provided", func() {
+
+			container.DefaultPutFactory(SimpleFactory("DEFAULT"))
+
+			called := false
+			Expect(container.CallInjected(func(a *Simple) {
+				called = true
+				Expect(a).To(Equal(&Simple{"DEFAULT"}))
+			})).To(Succeed())
+			Expect(called).To(BeTrue())
+
+		})
+
+		It("should inject core component even if default component is provided", func() {
+
+			container.DefaultPutFactory(SimpleFactory("DEFAULT"))
+			container.PutFactory(SimpleFactory("A"))
+
+			called := false
+			Expect(container.CallInjected(func(a *Simple) {
+				called = true
+				Expect(a).To(Equal(&Simple{"A"}))
+			})).To(Succeed())
+			Expect(called).To(BeTrue())
+
+		})
+
 		It("should inject test component if provided", func() {
 
 			container.PutFactory(SimpleFactory("A"))

@@ -87,3 +87,8 @@ func (self *cyclicError) String() string {
 func (self *cyclicError) Components() []*component {
 	return self.components
 }
+
+func isDirectCyclicError(err error) bool {
+	cyclic, ok := err.(*cyclicError)
+	return ok && len(cyclic.components) == 1
+}
