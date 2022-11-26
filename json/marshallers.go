@@ -27,6 +27,10 @@ func init() {
 		return JsonBool(v), nil
 	}, func(JsonMarshaller) {})
 
+	ioc.Put(func(v JsonNode) (JsonNode, error) {
+		return v, nil
+	}, func(JsonMarshaller) {})
+
 }
 
 // Pointer marshaller

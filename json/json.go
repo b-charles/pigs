@@ -13,7 +13,7 @@ var errorType = reflect.TypeOf(func(error) {}).In(0)
 var stringType = reflect.TypeOf(func(string) {}).In(0)
 var jsonType = reflect.TypeOf(func(JsonNode) {}).In(0)
 
-type Json interface {
+type Jsons interface {
 	Marshal(any) (JsonNode, error)
 	MarshalToString(any) (string, error)
 	Unmarshal(json JsonNode, callback any) error
@@ -282,5 +282,7 @@ func (self *JsonMapper) UnmarshalFromString(str string, callback any) error {
 }
 
 func init() {
-	ioc.Put(&JsonMapper{}, func(Json) {})
+	ioc.PutFactory(func() (*JsonMapper, error) {
+		return &JsonMapper{}, nil
+	}, func(Jsons) {})
 }

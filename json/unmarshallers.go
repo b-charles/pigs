@@ -51,6 +51,10 @@ func init() {
 		}
 	}, func(JsonUnmarshaller) {})
 
+	ioc.Put(func(json JsonNode) (JsonNode, error) {
+		return json, nil
+	}, func(JsonUnmarshaller) {})
+
 }
 
 // Pointer unmarshaller

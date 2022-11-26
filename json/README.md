@@ -44,7 +44,7 @@ fmt.Print(node.String()) // expect `{"a":"hello","b":{"c":{"d":"world"}},"e":[tr
 
 The main library use the core to define _marshallers_ and _unmarshallers_, which are ioc components used to convert a value to Json and vice versa. A marshaller should be defined as a `func(T) (core.JsonNode, error)` where `T` is the supported marshallable type. An unmarshaller should be defined as a `func(core.JsonNode) (T, error)` where `T` is again the supported unmarshallable type. Depending the usage, some type can be associate to only a marshaller or an unmarshaller, but several marshallers or unmarshallers can not be defined with the same type target.
 
-All marshallers and unmarshallers are grouped and can be called from an interface `Json` with several methods:
+All marshallers and unmarshallers are grouped and can be called from an interface `Jsons` with several methods:
  * The method `Marshal(any) (core.JsonNode, error)` use the correct marshaller to produce a `JsonNode`.
  * The method `MarshalToString(any) (string, error)` add a step to the `Marshal` method and convert the `JsonNode` to a `string`.
  * The method `Unmarshal(json core.JsonNode, callback func(T)) error` convert a node to a value and call the callback function with that value. The expected type is computed by looking at the callback argument.

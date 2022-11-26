@@ -7,8 +7,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func testMarshall(json Json, value any, expected string) {
-	node, err := json.Marshal(value)
+func testMarshall(jsons Jsons, value any, expected string) {
+	node, err := jsons.Marshal(value)
 	Expect(err).WithOffset(1).To(Succeed())
 	Expect(node.String()).WithOffset(1).To(Equal(expected))
 }
@@ -21,15 +21,15 @@ var _ = Describe("Json marshallers", func() {
 
 	It("should marshall simple values", func() {
 
-		ioc.CallInjected(func(json Json) {
+		ioc.CallInjected(func(jsons Jsons) {
 
-			testMarshall(json, "Praise You", `"Praise You"`)
+			testMarshall(jsons, "Praise You", `"Praise You"`)
 
-			testMarshall(json, 414.15, `414.15`)
-			testMarshall(json, 42, `42`)
+			testMarshall(jsons, 414.15, `414.15`)
+			testMarshall(jsons, 42, `42`)
 
-			testMarshall(json, true, `true`)
-			testMarshall(json, false, `false`)
+			testMarshall(jsons, true, `true`)
+			testMarshall(jsons, false, `false`)
 
 		})
 
@@ -47,8 +47,8 @@ var _ = Describe("Json marshallers", func() {
 			MySub2   *mySub `json:"sub2"`
 		}
 
-		ioc.CallInjected(func(json Json) {
-			testMarshall(json, myStruct{"Road Trippin'", mySub{42}, &mySub{21}}, `{"MyString":"Road Trippin'","sub1":{"value":42},"sub2":{"value":21}}`)
+		ioc.CallInjected(func(jsons Jsons) {
+			testMarshall(jsons, myStruct{"Road Trippin'", mySub{42}, &mySub{21}}, `{"MyString":"Road Trippin'","sub1":{"value":42},"sub2":{"value":21}}`)
 		})
 
 	})
@@ -60,8 +60,8 @@ var _ = Describe("Json marshallers", func() {
 			Sub   *recStruct `json:"s"`
 		}
 
-		ioc.CallInjected(func(json Json) {
-			testMarshall(json,
+		ioc.CallInjected(func(jsons Jsons) {
+			testMarshall(jsons,
 				recStruct{"Fatboy Slim", &recStruct{"You've Come a Long Way Baby", &recStruct{"Praise You", nil}}},
 				`{"v":"Fatboy Slim","s":{"v":"You've Come a Long Way Baby","s":{"v":"Praise You","s":null}}}`)
 		})
@@ -75,8 +75,8 @@ var _ = Describe("Json marshallers", func() {
 			Map   map[string]int
 		}
 
-		ioc.CallInjected(func(json Json) {
-			testMarshall(json,
+		ioc.CallInjected(func(jsons Jsons) {
+			testMarshall(jsons,
 				completeStruct{[]string{"Wild Cherry", "Play That Funky Music"}, map[string]int{"Daft Punk": 2}},
 				`{"Slice":["Wild Cherry","Play That Funky Music"],"Map":{"Daft Punk":2}}`)
 		})
