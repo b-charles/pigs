@@ -322,3 +322,20 @@ var _ = Describe("App tests", func() {
 })
 ```
 
+## Default integration
+
+### Afero
+
+The library defines a component in the default scope for [Afero](https://github.com/spf13/afero), which can be used to access to the filesystem:
+
+```go
+DefaultPutFactory(afero.NewOsFs, func(afero.Fs) {})
+```
+
+### Clock
+
+The library defines also a component in the default scope for [Clock](https://github.com/benbjohnson/clock), which wraps the standard library `time`:
+
+```go
+DefaultPutFactory(clock.New, func(clock.Clock) {})
+```
