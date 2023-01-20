@@ -180,7 +180,7 @@ var _ = Describe("IOC factory", func() {
 
 		})
 
-		It("should inject a slice with nil components", func() {
+		It("should inject a slice discarding nil components", func() {
 
 			container.PutFactory(SimpleFactory("A1"))
 			container.PutFactory(func() *Simple { return nil })
@@ -191,7 +191,6 @@ var _ = Describe("IOC factory", func() {
 			container.CallInjected(func(injected *SliceInjected) {
 				Expect(injected.Simple).To(ConsistOf(
 					&Simple{"A1"},
-					(*Simple)(nil),
 					&Simple{"A3"}))
 			})
 

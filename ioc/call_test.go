@@ -76,22 +76,23 @@ var _ = Describe("IOC call", func() {
 
 		})
 
-		It("should inject nil", func() {
+		It("should inject default component if nothing is provided", func() {
 
-			container.PutFactory(func() *Simple { return nil })
+			container.DefaultPutFactory(SimpleFactory("DEFAULT"))
 
 			called := false
 			Expect(container.CallInjected(func(a *Simple) {
 				called = true
-				Expect(a).To(BeNil())
+				Expect(a).To(Equal(&Simple{"DEFAULT"}))
 			})).To(Succeed())
 			Expect(called).To(BeTrue())
 
 		})
 
-		It("should inject default component if nothing is provided", func() {
+		It("should inject default component if default component is nil", func() {
 
 			container.DefaultPutFactory(SimpleFactory("DEFAULT"))
+			container.PutFactory(func() *Simple { return nil })
 
 			called := false
 			Expect(container.CallInjected(func(a *Simple) {
@@ -106,6 +107,20 @@ var _ = Describe("IOC call", func() {
 
 			container.DefaultPutFactory(SimpleFactory("DEFAULT"))
 			container.PutFactory(SimpleFactory("A"))
+
+			called := false
+			Expect(container.CallInjected(func(a *Simple) {
+				called = true
+				Expect(a).To(Equal(&Simple{"A"}))
+			})).To(Succeed())
+			Expect(called).To(BeTrue())
+
+		})
+
+		It("should inject core component if test component is nil", func() {
+
+			container.PutFactory(SimpleFactory("A"))
+			container.TestPutFactory(func() *Simple { return nil })
 
 			called := false
 			Expect(container.CallInjected(func(a *Simple) {
@@ -131,6 +146,15 @@ var _ = Describe("IOC call", func() {
 		})
 
 		It("should return an error if no component is provided", func() {
+
+			Expect(container.CallInjected(func(a *Simple) {
+			})).To(HaveOccurred())
+
+		})
+
+		It("should return an error if the only component is nil", func() {
+
+			container.PutFactory(func() *Simple { return nil })
 
 			Expect(container.CallInjected(func(a *Simple) {
 			})).To(HaveOccurred())
@@ -220,7 +244,7 @@ var _ = Describe("IOC call", func() {
 
 		})
 
-		It("should inject a slice with nil components", func() {
+		It("should inject a slice with discarding nil components", func() {
 
 			container.PutFactory(SimpleFactory("A1"))
 			container.PutFactory(func() *Simple { return nil })
@@ -230,9 +254,22 @@ var _ = Describe("IOC call", func() {
 			Expect(container.CallInjected(func(slice []*Simple) {
 				called = true
 				Expect(slice).To(ConsistOf(
-					(*Simple)(nil),
 					&Simple{"A1"},
 					&Simple{"A3"}))
+			})).To(Succeed())
+			Expect(called).To(BeTrue())
+
+		})
+
+		It("should inject an empty slice if all components are nil", func() {
+
+			container.PutFactory(func() *Simple { return nil })
+			container.PutFactory(func() *Simple { return nil })
+
+			called := false
+			Expect(container.CallInjected(func(slice []*Simple) {
+				called = true
+				Expect(slice).To(BeEmpty())
 			})).To(Succeed())
 			Expect(called).To(BeTrue())
 

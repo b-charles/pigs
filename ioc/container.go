@@ -105,33 +105,51 @@ func wrap(component any) reflect.Value {
 // DefaultPutFactory records a default component defined by a factory and
 // optional signatures.
 func (self *Container) DefaultPutFactory(factory any, signFuncs ...any) error {
+	if factory == nil {
+		return nil
+	}
 	return self.putIn(reflect.ValueOf(factory), signFuncs, def)
 }
 
 // DefaultPut records directly a default component with optional signatures.
 func (self *Container) DefaultPut(component any, signFuncs ...any) error {
+	if component == nil {
+		return nil
+	}
 	return self.putIn(wrap(component), signFuncs, def)
 }
 
 // PutFactory records a component defined by a factory and optional
 // signatures.
 func (self *Container) PutFactory(factory any, signFuncs ...any) error {
+	if factory == nil {
+		return nil
+	}
 	return self.putIn(reflect.ValueOf(factory), signFuncs, core)
 }
 
 // Put records directly a component with optional signatures.
 func (self *Container) Put(component any, signFuncs ...any) error {
+	if component == nil {
+		return nil
+	}
 	return self.putIn(wrap(component), signFuncs, core)
 }
 
 // TestPutFactory records a test component defined by a factory and
 // optional signatures.
 func (self *Container) TestPutFactory(factory any, signFuncs ...any) error {
+	if factory == nil {
+		return nil
+	}
 	return self.putIn(reflect.ValueOf(factory), signFuncs, test)
 }
 
 // TestPut records directly a test component with optional signatures.
 func (self *Container) TestPut(component any, signFuncs ...any) error {
+	if component == nil {
+		return nil
+	}
 	return self.putIn(wrap(component), signFuncs, test)
 }
 
@@ -216,7 +234,7 @@ func (self *Container) getInstances(typ reflect.Type, stack *componentStack) ([]
 
 				return nil, err
 
-			} else {
+			} else if !instance.isNil() {
 
 				instances = append(instances, instance)
 
@@ -224,7 +242,9 @@ func (self *Container) getInstances(typ reflect.Type, stack *componentStack) ([]
 
 		}
 
-		return instances, nil
+		if len(instances) > 0 {
+			return instances, nil
+		}
 
 	}
 
@@ -252,7 +272,7 @@ func (self *Container) getInstances(typ reflect.Type, stack *componentStack) ([]
 
 				return nil, err
 
-			} else {
+			} else if !instance.isNil() {
 
 				instances = append(instances, instance)
 
@@ -260,7 +280,9 @@ func (self *Container) getInstances(typ reflect.Type, stack *componentStack) ([]
 
 		}
 
-		return instances, nil
+		if len(instances) > 0 {
+			return instances, nil
+		}
 
 	}
 
@@ -274,7 +296,7 @@ func (self *Container) getInstances(typ reflect.Type, stack *componentStack) ([]
 
 			if instance, err := self.instanciates(component, stack); err != nil {
 				return nil, err
-			} else {
+			} else if !instance.isNil() {
 				instances = append(instances, instance)
 			}
 
@@ -300,7 +322,7 @@ func (self *Container) getValue(target reflect.Type, stack *componentStack) (ref
 
 		return instances[0].value.Convert(target), nil
 
-	} else if target.Kind() == reflect.Slice {
+	} else if len(instances) == 0 && target.Kind() == reflect.Slice {
 
 		elemTarget := target.Elem()
 
@@ -392,6 +414,19 @@ func (self *Container) callInjected(method reflect.Value, stack *componentStack)
 
 // EXTERNAL RESOLUTION
 
+func (self *Container) isInTestEnv() (bool, error) {
+	for _, components := range self.testComponents {
+		for _, comp := range components {
+			if instance, err := self.instanciates(comp, newComponentStack()); err != nil {
+				return false, err
+			} else if !instance.isNil() {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 // CallInjected call the given method, injecting its arguments.
 func (self *Container) CallInjected(method any) error {
 
@@ -427,20 +462,25 @@ func (self *Container) CallInjected(method any) error {
 		return err
 	}
 
+	// instanciates all test components to check if running in test environment
+	isTestEnv, err := self.isInTestEnv()
+	if err != nil {
+		return err
+	}
+
 	// update status
 	if status, present := self.instances[self.status]; present {
 		status.value.Interface().(*ContainerStatus).update()
 	}
 
-	// release unused instances
+	// release instances
 
 	self.instances = make(map[*component]*instance)
-
-	if len(self.testComponents) == 0 {
+	if isTestEnv {
+		self.testComponents = map[reflect.Type][]*component{}
+	} else {
 		self.defaultComponents = map[reflect.Type][]*component{}
 		self.coreComponents = map[reflect.Type][]*component{}
-	} else {
-		self.testComponents = map[reflect.Type][]*component{}
 	}
 
 	// calling

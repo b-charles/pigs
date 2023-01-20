@@ -13,11 +13,34 @@ type instance struct {
 	value    reflect.Value
 }
 
+func (self *instance) isNil() bool {
+
+	if self == nil {
+		return true
+	}
+
+	kind := self.value.Kind()
+	if kind == reflect.Chan ||
+		kind == reflect.Func ||
+		kind == reflect.Map ||
+		kind == reflect.Pointer ||
+		kind == reflect.UnsafePointer ||
+		kind == reflect.Interface ||
+		kind == reflect.Slice {
+
+		return self.value.IsNil()
+
+	}
+
+	return false
+
+}
+
 // initialize initializes the instance: if the instance is a struct or a
 // pointer to a struct, each tagged 'inject' field is injected.
 func (self *instance) initialize(stack *componentStack) error {
 
-	if self == nil {
+	if self.isNil() {
 		return nil
 	}
 
@@ -55,7 +78,7 @@ func (self *instance) initialize(stack *componentStack) error {
 // postInit call the PostInit method (if defined).
 func (self *instance) postInit(stack *componentStack) error {
 
-	if self == nil {
+	if self.isNil() {
 		return nil
 	}
 
@@ -92,7 +115,7 @@ func (self *instance) postInit(stack *componentStack) error {
 
 // castToCloser checks if the instance can be casted to an io.Closer.
 func (self *instance) castToCloser() (io.Closer, bool) {
-	if self == nil {
+	if self.isNil() {
 		return nil, false
 	} else {
 		closer, closable := self.value.Interface().(io.Closer)
@@ -116,7 +139,7 @@ func (self *instance) Close() {
 
 // String returns a string representation of the instance.
 func (self *instance) String() string {
-	if self == nil {
+	if self.isNil() {
 		return "nil"
 	} else {
 		return fmt.Sprintf("%v", self.value.Interface())

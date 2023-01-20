@@ -26,7 +26,7 @@ And some goals are deliberated ignored:
 
 ### Container and component
 
-A component is something: a struct, a pointer, a map, a chan, an integer... It's a variable that should be unique (singleton) and which will be injected in all other components that need it. Each component is defined by its type and optionally some _signatures_: some additional interfaces which are implemented by the component and declared when registering the component[^duck]. Multiple components can share the same type and signatures to enable auto-discovery, but that concept can be confusing and error-prone: it can be considered good practice to register each component with a specific and unique type, and using signatures only when auto-discovery is needed.
+A component is something: a struct, a pointer, a map, a chan, an integer... anything but `nil`. It's a variable that should be unique (singleton) and which will be injected in all other components that need it. Each component is defined by its type and optionally some _signatures_: some additional interfaces which are implemented by the component and declared when registering the component[^duck]. Multiple components can share the same type and signatures to enable auto-discovery, but that concept can be confusing and error-prone: it can be considered good practice to register each component with a specific and unique type, and using signatures only when auto-discovery is needed. Any component with a value `nil` will be silently discarded and never be injected in another comonent. This behaviour, together with auto-discovery and scopes features, helps implement conditional component creation.
 
 A container is a set of components: it manages the lifecycle of each component and take in charge the injection process. The container is a managed component itself and can be injected in any component.
 
@@ -64,7 +64,7 @@ Injected functions can take any number of input arguments, none included.
 
 #### Auto-discovery injection
 
-Whether it is an injection in a structure or in a function, if no component or too many components are defined, the container returns an error. But you can inject all components sharing the same type or signature: that's the foundation of the auto-discovery. If the injected value is of type slice, the container will start by trying to resolve the injection normally (a component can be defined as a slice). If no single component match the definition (i.e. if there is no or several components found for inject the value), the container will create a slice, add in it all the components with the correct type or signature, and inject that slice:
+Whether it is an injection in a structure or in a function, if no component or too many components are defined, the container returns an error. But you can inject all components sharing the same type or signature: that's the foundation of the auto-discovery. If the injected value is of type slice, the container will start by trying to resolve the injection normally (a component can be defined as a slice). If no component match the definition, the container will create a slice, add in it all the components with the correct type or signature, and inject that slice:
 ```go
 type MyInjectedStruct struct {
     AllComponents []SomeInterface `inject:""`
@@ -72,11 +72,11 @@ type MyInjectedStruct struct {
 
 var injected *MyInjectedStruct = &MyInjectedStruct{}
 ```
-Here, if `injected` is injected by the container, the field `AllComponents` will contains every components defined with the type or signature `SomeInterface`. If no component are found, the injected slice is empty.
+Here, if `injected` is injected by the container, the field `AllComponents` will contains every components defined with the type or signature `SomeInterface`. The injected slice will never contain a `nil` value: `nil` components are discarded. If no component are found, the injected slice is empty. This feature can useful to implement an optional injection.
 
 #### Scopes: Default and Testing
 
-Like it's said in the main goals of the framework, there is no concept of scope, or at least not extendable scope. In fact, the container is divided in three set of components: one for the default components, one for the core components, and one for tests. Every time an injection is proceeded, the container start by searching any component in the test set. If nothing is found, then the container use the core set. If still nothing is found, then the container use the default set. In case of auto-discovery injection (slice), if at least one matching component is found in the test set, that components are injected and the components in the core set are not used (which means you can not run a test with an auto-discovered slice empty when it is not outside of testing), and in the same spirit, if the core set is used and at least one component is found, the default set is ignored.
+Like it's said in the main goals of the framework, there is no concept of scope, or at least not extendable scope. In fact, the container is divided in three set of components: one for the default components, one for the core components, and one for tests. Every time an injection is proceeded, the container start by searching any component in the test set. If nothing is found or if the components are `nil`, the container use the core set. If still nothing is found (or only `nil` components), then the container use the default set. In case of auto-discovery injection (slice), if at least one matching component is found in the test set, that components are injected and the components in the core set are not used (which also means if you have configured some components to be auto-discovered in the default or core scope, you can not run a test with the auto-discovered slice empty), and in the same spirit, if the core set is used and at least one component is found, the default set is ignored.
 
 The API is defined to record a component in the default set, the core set or in the test set. With that mechanisms, it's easy to:
  * write some libraries with default fonctionnalities which can be overloaded by the main application,
@@ -113,7 +113,7 @@ func init() {
     ioc.Put(&DemoComponent{})
 }
 ```
-Recording a component doesn't inject it (not yet). It is only recorded as a not yet initialized component. Signatures can be defined with one or several little weird functions. For example, `func(FirstInterface, SecondInterface) {}` defines two signatures `FirstInterface` and  `SecondInterface`. Signatures can be defined in the `ioc.Put` function:
+Calling the function with `nil` as input will do nothing. Recording a component doesn't inject it (not yet). It is only recorded as a not yet initialized component. Signatures can be defined with one or several little weird functions. For example, `func(FirstInterface, SecondInterface) {}` defines two signatures `FirstInterface` and  `SecondInterface`. Signatures can be defined in the `ioc.Put` function:
 ```go
 type DemoComponent struct { ... }
 
@@ -137,7 +137,7 @@ func init() {
     ioc.PutFactory(ComponentFactory, func(FirstInterface, SecondInterface) {});
 }
 ```
-The function `PutFactory` use the type of the first output to get the type of the component. Like `ioc.Put`, if signatures are defined, `ioc.PutFactory` will check that each signature is implemented by the returned type of the factory. Recording a factory doesn't call it, but it will be used to instantiate the component in a next step. At that time, the arguments of the factory will be injected like it is described in the section [Injection of functions](#injection-of-functions). The factory should at least return the created component, and can also return an error:
+The function `PutFactory` use the type of the first output to get the type of the component. Like `ioc.Put`, registering a `nil` value will do nothing, and if signatures are defined, `ioc.PutFactory` will check that each signature is implemented by the returned type of the factory. Recording a factory doesn't call it, but it will be used to instantiate the component in a next step. At that time, the arguments of the factory will be injected like it is described in the section [Injection of functions](#injection-of-functions). The factory should at least return the created component or `nil`: in that case, the component will be discarded and not used in the future injections. The factory can also return an error:
 ```go
 type DemoComponent struct {}
 
@@ -215,11 +215,11 @@ After the main function executed, the container will close automatically every c
 
 ### Redefinition
 
-It should be only one call of `CallInjected` during the run of the application or at each unit test: after a call of `CallInjected`, every instances are released along the component definitions (default and core) if no test components are found. Otherwise, if at least one component is defined in the test scope, instances and only test component definitions are released.
+It should be only one call of `CallInjected` during the run of the application or at each unit test: after a call of `CallInjected`, every instances are released along the component definitions (default and core) if no test components are found or the associated instances are `nil`. Otherwise, if at least one component is defined in the test scope and its instance is not `nil`, instances of all scopes and component definitions of test scope only are released.
 
-So, if you are running unit tests, you have to defined some fixture to redefined each time all the test components you want to use, and for each test, every component is re-instanced. Be sure to define at least one component in the test scope (even if it is not used and not instanciated) before each call of `CallInjected` or you will loosing the definitions of all the core components.
+So, if you are running unit tests, you have to defined some fixture to redefined each time all the test components you want to use, and for each test, every component is re-instanced. Be sure to define at least one component (with a not `nil` value, e.g. a random string is enough) in the test scope, even if it is not used, before each call of `CallInjected` or you will loosing the definitions of all the core components.
 
-If no test component is defined, the framework considers that you are really running your application. In this case, in order to consume the least RAM as possible, all unused component instances and all component definitions will be released (forgotten by the framework) and can be deleted by the garbage collector if no other component reference them.
+If no test component are defined, the framework considers that you are really running your application. In this case, in order to consume the least RAM as possible, all unused component instances and all component definitions will be released (forgotten by the framework) and can be deleted by the garbage collector if no other component reference them.
 
 ## Usage example
 
