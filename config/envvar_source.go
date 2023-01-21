@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -38,7 +39,7 @@ func (self EnvVarConfigSource) LoadEnv(config MutableConfig) error {
 }
 
 func (self EnvVarConfigSource) String() string {
-	return stringify(self)
+	return fmt.Sprintf("Environment variables: %s", stringify(self))
 }
 
 func init() {

@@ -7,9 +7,11 @@ require (
 	github.com/b-charles/pigs/json v0.0.0-00010101000000-000000000000
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.20.0
+	github.com/spf13/afero v1.9.3
 )
 
 require (
+	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect

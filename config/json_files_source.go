@@ -2,14 +2,12 @@ package config
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
 	"strings"
 
 	"github.com/b-charles/pigs/ioc"
 	"github.com/b-charles/pigs/json"
+	"github.com/spf13/afero"
 )
 
 func mergeIn(config MutableConfig, path string, json json.JsonNode) {
@@ -71,7 +69,17 @@ func mergeIn(config MutableConfig, path string, json json.JsonNode) {
 
 }
 
-func LoadJsonEnv(config MutableConfig, filesys fs.FS, wd string) error {
+var CONFIG_SOURCE_JSON_PREFIX = "config.json"
+
+type JsonFilesConfigSource struct {
+	fs afero.Fs
+}
+
+func (self *JsonFilesConfigSource) GetPriority() int {
+	return CONFIG_SOURCE_PRIORITY_JSON_FILES
+}
+
+func (self *JsonFilesConfigSource) LoadEnv(config MutableConfig) error {
 
 	keys := []string{}
 	for _, key := range config.Keys() {
@@ -81,20 +89,15 @@ func LoadJsonEnv(config MutableConfig, filesys fs.FS, wd string) error {
 	}
 
 	for _, key := range keys {
-		if path, err := config.Get(key); err != nil {
+
+		if path, _, err := config.Lookup(key); err != nil {
 
 			return err
 
 		} else {
 
-			if !strings.HasPrefix(path, "/") {
-				path = wd + "/" + path
-			}
-
-			if b, err := fs.ReadFile(filesys, path); err != nil {
-				if !errors.Is(err, fs.ErrNotExist) {
-					return err
-				}
+			if b, err := afero.ReadFile(self.fs, path); err != nil {
+				continue
 			} else if json, err := json.Parse(bytes.NewReader(b)); err != nil {
 				return err
 			} else {
@@ -102,39 +105,23 @@ func LoadJsonEnv(config MutableConfig, filesys fs.FS, wd string) error {
 			}
 
 		}
+
 	}
 
 	return nil
 
 }
 
-var CONFIG_SOURCE_JSON_PREFIX = "config.json"
-
-type JsonFilesConfigSource struct{}
-
-func (self *JsonFilesConfigSource) GetPriority() int {
-	return CONFIG_SOURCE_PRIORITY_JSON_FILES
-}
-
-func (self *JsonFilesConfigSource) LoadEnv(config MutableConfig) error {
-
-	filesys := os.DirFS("/")
-
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	return LoadJsonEnv(config, filesys, wd)
-
+func (self *JsonFilesConfigSource) String() string {
+	return "Json files"
 }
 
 func init() {
 
-	SetDefault(CONFIG_SOURCE_JSON_PREFIX, "application.json")
+	Set(CONFIG_SOURCE_JSON_PREFIX, "application.json")
 
-	ioc.PutFactory(func() (*JsonFilesConfigSource, error) {
-		return &JsonFilesConfigSource{}, nil
+	ioc.PutFactory(func(fs afero.Fs) (*JsonFilesConfigSource, error) {
+		return &JsonFilesConfigSource{fs}, nil
 	}, func(ConfigSource) {})
 
 }

@@ -35,18 +35,56 @@ func (self *SimpleConfigSource) LoadEnv(config MutableConfig) error {
 
 var _ = Describe("Configuration", func() {
 
-	Describe("Injection and merge", func() {
+	Describe("Default config source", func() {
 
-		It("Should get a simple source", func() {
+		var backup map[string]string
 
-			SetTest(map[string]string{
-				"hello": "world",
-			})
+		BeforeEach(func() {
+			ioc.TestPut("ioc test flag")
+			backup = BackupDefault()
+		})
+
+		AfterEach(func() {
+			RestoreDefault(backup)
+		})
+
+		It("should record default entries", func() {
+
+			Set("somebody", "that I used to know")
 
 			ioc.CallInjected(func(config Configuration) {
-				Expect(config.Get("hello")).To(Equal("world"))
+				Expect(config.Get("somebody")).To(Equal("that I used to know"))
 			})
 
+		})
+
+		It("should panic if a default entry is defined twice", func() {
+
+			Set("ed.sheeran", "Nancy Moligan")
+			Expect(func() {
+				Set("ed.sheeran", "What do I know?")
+			}).Should(Panic())
+
+		})
+
+		It("should merge default and tests settings", func() {
+
+			Set("daft.punk", "Something About Us")
+			Test("justice", "D.A.N.C.E")
+
+			ioc.CallInjected(func(config Configuration) {
+				Expect(config.Get("daft.punk")).To(Equal("Something About Us"))
+				Expect(config.Get("justice")).To(Equal("D.A.N.C.E"))
+			})
+
+		})
+
+	})
+
+	Describe("Injection and merge", func() {
+
+		BeforeEach(func() {
+			ioc.TestPut("ioc test flag")
 		})
 
 		It("Should merge multiple sources", func() {
@@ -70,10 +108,8 @@ var _ = Describe("Configuration", func() {
 
 		It("Should resolve simple placeholder", func() {
 
-			SetTest(map[string]string{
-				"name":   "Batman",
-				"whoami": "I'm ${name}",
-			})
+			Test("name", "Batman")
+			Test("whoami", "I'm ${name}")
 
 			ioc.CallInjected(func(config Configuration) {
 				Expect(config.Get("whoami")).To(Equal("I'm Batman"))
@@ -83,7 +119,7 @@ var _ = Describe("Configuration", func() {
 
 		It("Should resolve complex placeholder", func() {
 
-			SetTest(map[string]string{
+			TestMap(map[string]string{
 				"egg":             "oeuf",
 				"ham":             "jambon",
 				"cheese":          "fromage",
@@ -94,6 +130,16 @@ var _ = Describe("Configuration", func() {
 
 			ioc.CallInjected(func(config Configuration) {
 				Expect(config.Get("plate")).To(Equal("oeuf, jambon, fromage"))
+			})
+
+		})
+
+		It("Should not touch placeholders which are not found", func() {
+
+			Test("whoami", "I'm ${name}")
+
+			ioc.CallInjected(func(config Configuration) {
+				Expect(config.Get("whoami")).To(Equal("I'm ${name}"))
 			})
 
 		})

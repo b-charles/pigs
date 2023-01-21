@@ -87,7 +87,7 @@ func (self ArgsConfigSource) LoadEnv(config MutableConfig) error {
 }
 
 func (self ArgsConfigSource) String() string {
-	return stringify(self)
+	return fmt.Sprintf("Arguments: %s", stringify(self))
 }
 
 func NewArgsConfigSource() (ArgsConfigSource, error) {

@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/b-charles/pigs/ioc"
 )
@@ -22,102 +23,115 @@ type ConfigSource interface {
  * Mutable config
  */
 
-func keys(m map[string]string) []string {
+type MutableConfig interface {
+	HasKey(string) bool
+	Keys() []string
+	GetRaw(string) (string, bool)
+	Lookup(string) (string, bool, error)
+	Get(string) string
+	Set(string, string)
+}
 
-	keys := make([]string, 0, len(m))
-	for k := range m {
+type Configuration interface {
+	HasKey(string) bool
+	Keys() []string
+	GetRaw(string) (string, bool)
+	Lookup(string) (string, bool, error)
+	Get(string) string
+}
+
+type configImpl struct {
+	mutable  bool
+	raws     map[string]string
+	resolved map[string]string
+}
+
+func (self *configImpl) HasKey(key string) bool {
+	_, p := self.raws[key]
+	return p
+}
+
+func (self *configImpl) Keys() []string {
+	keys := make([]string, 0, len(self.raws))
+	for k := range self.raws {
 		keys = append(keys, k)
 	}
-
 	return keys
-
 }
 
-type MutableConfig map[string]string
-
-func (self MutableConfig) HasKey(key string) bool {
-	_, present := self[key]
-	return present
+func (self *configImpl) GetRaw(key string) (string, bool) {
+	value, p := self.raws[key]
+	return value, p
 }
 
-func (self MutableConfig) Keys() []string {
-	return keys(self)
-}
+var placeholderRegexp *regexp.Regexp = regexp.MustCompile("\\${\\s*([^{}]+)\\s*}")
 
-func (self MutableConfig) Get(key string) (string, error) {
-	return resolveValue(self, key, map[string]bool{}, false)
-}
+func (self *configImpl) resolveValue(key string, traveled map[string]bool) (string, bool, *CyclicLoopError) {
 
-func (self MutableConfig) Lookup(key string) (string, bool, error) {
-	if _, p := self[key]; p {
-		v, e := resolveValue(self, key, map[string]bool{}, false)
-		return v, true, e
-	} else {
+	if resolved, p := self.resolved[key]; p {
+		return resolved, true, nil
+	}
+	if value, p := self.raws[key]; !p {
 		return "", false, nil
-	}
-}
+	} else {
 
-func (self MutableConfig) Set(key, value string) {
-	self[key] = value
-}
-
-func (self MutableConfig) String() string {
-	return stringify(self)
-}
-
-/*
- * Configuration
- */
-
-type Configuration map[string]string
-
-func (self *Configuration) Keys() []string {
-	return keys(*self)
-}
-
-func (self *Configuration) Get(key string) string {
-	return (*self)[key]
-}
-
-func (self *Configuration) Lookup(key string) (string, bool) {
-	v, p := (*self)[key]
-	return v, p
-}
-
-func (self Configuration) String() string {
-	return stringify(self)
-}
-
-/*
- * Factory
- */
-
-func CreateConfiguration(sources []ConfigSource) (Configuration, error) {
-
-	sort.Slice(sources, func(i, j int) bool {
-		return sources[i].GetPriority() < sources[j].GetPriority()
-	})
-
-	mutable := MutableConfig(map[string]string{})
-	for _, source := range sources {
-		err := source.LoadEnv(mutable)
-		if err != nil {
-			return nil, fmt.Errorf("Error during loading configuration from '%v': %w", source, err)
+		if t, p := traveled[key]; p && t {
+			return value, true, newCyclicLoopError(key, value)
 		}
-	}
+		traveled[key] = true
 
-	for key := range mutable {
-		if _, err := resolveValue(mutable, key, map[string]bool{}, true); err != nil {
-			return nil, err
+		replace := true
+		for replace {
+
+			replace = false
+			if matches := placeholderRegexp.FindAllStringSubmatch(value, -1); matches != nil {
+				for _, match := range matches {
+					if subvalue, found, err := self.resolveValue(match[1], traveled); err != nil {
+						return "", true, err.push(key, value)
+					} else if found {
+						value = strings.Replace(value, match[0], subvalue, -1)
+						replace = true
+						break
+					}
+				}
+			}
+
 		}
-	}
 
-	return Configuration(mutable), nil
+		traveled[key] = false
+
+		if !self.mutable {
+			self.resolved[key] = value
+		}
+
+		return value, true, nil
+
+	}
 
 }
 
-func init() {
-	ioc.PutFactory(CreateConfiguration)
+func (self *configImpl) Lookup(key string) (string, bool, error) {
+	if value, found, err := self.resolveValue(key, map[string]bool{}); err == (*CyclicLoopError)(nil) {
+		return value, found, nil
+	} else {
+		return value, found, error(err)
+	}
+}
+
+func (self *configImpl) Get(key string) string {
+	if v, _, err := self.Lookup(key); err != nil {
+		panic(err)
+	} else {
+		return v
+	}
+}
+
+func (self *configImpl) Set(key, value string) {
+	self.raws[key] = value
+}
+
+func (self *configImpl) String() string {
+	return stringify(self.raws)
 }
 
 /*
@@ -145,6 +159,10 @@ func (self *CyclicLoopError) push(key, value string) *CyclicLoopError {
 
 func (self *CyclicLoopError) Error() string {
 
+	if self == nil {
+		return "Nil cyclic loop error. Should not be raised."
+	}
+
 	var b strings.Builder
 
 	b.WriteString("Cyclic loop detected: ")
@@ -165,43 +183,90 @@ func (self *CyclicLoopError) Error() string {
 }
 
 /*
- * Value resolving
+ * Default
  */
 
-var placeholderRegexp *regexp.Regexp = regexp.MustCompile("\\${\\s*([^{}]+)\\s*}")
+var defaultConfigMap map[string]string
+var onceDefaultConfigMap sync.Once
 
-func resolveValue(env map[string]string, key string, traveled map[string]bool, record bool) (string, *CyclicLoopError) {
+func getDefaultConfigMap() map[string]string {
 
-	value, exist := env[key]
-	if !exist {
-		return "", nil
-	}
+	onceDefaultConfigMap.Do(func() {
+		defaultConfigMap = map[string]string{}
+	})
 
-	if t, p := traveled[key]; p && t {
-		return "", newCyclicLoopError(key, value)
-	}
-	traveled[key] = true
+	return defaultConfigMap
 
-	match := placeholderRegexp.FindStringSubmatch(value)
-	for match != nil {
+}
 
-		subvalue, err := resolveValue(env, match[1], traveled, record)
-		if err != nil {
-			return "", err.push(key, value)
+func Set(key, value string) {
+	SetMap(map[string]string{key: value})
+}
+
+func SetMap(values map[string]string) {
+
+	config := getDefaultConfigMap()
+
+	for key, value := range values {
+		if oldValue, present := config[key]; present {
+			panic(fmt.Sprintf("The default value '%s' can't be overwrited from '%s' to '%s'.", key, oldValue, value))
 		}
-
-		value = strings.Replace(value, match[0], subvalue, -1)
-
-		match = placeholderRegexp.FindStringSubmatch(value)
-
+		config[key] = value
 	}
 
-	traveled[key] = false
+}
 
-	if record {
-		env[key] = value
+func BackupDefault() map[string]string {
+	config := getDefaultConfigMap()
+	backup := make(map[string]string, len(config))
+	for k, v := range config {
+		backup[k] = v
+	}
+	return backup
+}
+
+func RestoreDefault(backup map[string]string) {
+	config := getDefaultConfigMap()
+	for k := range config {
+		delete(config, k)
+	}
+	for k, v := range backup {
+		config[k] = v
+	}
+}
+
+/*
+ * Factory
+ */
+
+func CreateConfiguration(sources []ConfigSource) (Configuration, error) {
+
+	sort.Slice(sources, func(i, j int) bool {
+		return sources[i].GetPriority() < sources[j].GetPriority()
+	})
+
+	conf := &configImpl{
+		mutable:  true,
+		raws:     make(map[string]string),
+		resolved: make(map[string]string),
 	}
 
-	return value, nil
+	for k, v := range getDefaultConfigMap() {
+		conf.Set(k, v)
+	}
+	for _, source := range sources {
+		err := source.LoadEnv(conf)
+		if err != nil {
+			return nil, fmt.Errorf("Error during loading configuration from '%v': %w", source, err)
+		}
+	}
 
+	conf.mutable = false
+
+	return conf, nil
+
+}
+
+func init() {
+	ioc.PutFactory(CreateConfiguration)
 }
