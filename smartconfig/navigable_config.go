@@ -20,27 +20,27 @@ type NavConfig interface {
 	Get(string) NavConfig
 }
 
-type NavConfigImpl struct {
-	root     *NavConfigImpl
-	parent   *NavConfigImpl
+type navConfigImpl struct {
+	root     *navConfigImpl
+	parent   *navConfigImpl
 	path     string
 	value    string
-	children map[string]*NavConfigImpl
+	children map[string]*navConfigImpl
 }
 
-func (self *NavConfigImpl) Root() NavConfig {
+func (self *navConfigImpl) Root() NavConfig {
 	return self.root
 }
 
-func (self *NavConfigImpl) Parent() NavConfig {
+func (self *navConfigImpl) Parent() NavConfig {
 	return self.parent
 }
 
-func (self *NavConfigImpl) Path() string {
+func (self *navConfigImpl) Path() string {
 	return self.path
 }
 
-func (self *NavConfigImpl) Value() string {
+func (self *navConfigImpl) Value() string {
 	return self.value
 }
 
@@ -65,7 +65,7 @@ func keyLess(a, b string) bool {
 
 }
 
-func (self *NavConfigImpl) Keys() []string {
+func (self *navConfigImpl) Keys() []string {
 	keys := make([]string, 0, len(self.children))
 	for k := range self.children {
 		keys = append(keys, k)
@@ -84,26 +84,26 @@ func path(root, key string) string {
 	}
 }
 
-func (self *NavConfigImpl) child(key string) *NavConfigImpl {
+func (self *navConfigImpl) child(key string) *navConfigImpl {
 	if child, pres := self.children[key]; pres {
 		return child
 	}
-	child := &NavConfigImpl{
+	child := &navConfigImpl{
 		root:     self.root,
 		parent:   self,
 		path:     path(self.path, key),
 		value:    "",
-		children: map[string]*NavConfigImpl{},
+		children: map[string]*navConfigImpl{},
 	}
 	self.children[key] = child
 	return child
 }
 
-func (self *NavConfigImpl) Child(key string) NavConfig {
+func (self *navConfigImpl) Child(key string) NavConfig {
 	return self.child(key)
 }
 
-func (self *NavConfigImpl) Get(key string) NavConfig {
+func (self *navConfigImpl) Get(key string) NavConfig {
 
 	conf := self
 	for i, k := range strings.Split(key, ".") {
@@ -118,9 +118,9 @@ func (self *NavConfigImpl) Get(key string) NavConfig {
 
 }
 
-func NewNavMap(config config.Configuration) (*NavConfigImpl, error) {
+func NewNavMap(config config.Configuration) (NavConfig, error) {
 
-	root := &NavConfigImpl{nil, nil, "", "", map[string]*NavConfigImpl{}}
+	root := &navConfigImpl{nil, nil, "", "", map[string]*navConfigImpl{}}
 	root.root = root
 
 	for _, key := range config.Keys() {
@@ -132,7 +132,7 @@ func NewNavMap(config config.Configuration) (*NavConfigImpl, error) {
 
 }
 
-func insert(keys []string, value string, navKey *NavConfigImpl) {
+func insert(keys []string, value string, navKey *navConfigImpl) {
 
 	if len(keys) == 0 {
 		navKey.value = value

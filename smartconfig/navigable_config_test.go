@@ -9,34 +9,24 @@ import (
 )
 
 func complexSetup() {
-	config.SetTest(map[string]string{
-		"co.rrup.tion":   "corruption",
-		"con.fe.ren.ce":  "conference",
-		"con.fe.ssion":   "confession",
-		"con.fu.sion":    "confusion",
-		"ga.la.xy":       "galaxy",
-		"ga.lle.ry":      "gallery",
-		"in.fec.tion":    "infection",
-		"in.qui.ry":      "inquiry",
-		"in.vest.ment":   "investment",
-		"pa.ra.dox":      "paradox",
-		"pa.ra.gra.ph":   "paragraph",
-		"per.for.ate":    "perforate",
-		"per.for.man.ce": "performance",
+	config.TestMap(map[string]string{
+		"dic.co.rrup.tion":   "corruption",
+		"dic.con.fe.ren.ce":  "conference",
+		"dic.con.fe.ssion":   "confession",
+		"dic.con.fu.sion":    "confusion",
+		"dic.ga.la.xy":       "galaxy",
+		"dic.ga.lle.ry":      "gallery",
+		"dic.in.fec.tion":    "infection",
+		"dic.in.qui.ry":      "inquiry",
+		"dic.in.vest.ment":   "investment",
+		"dic.pa.ra.dox":      "paradox",
+		"dic.pa.ra.gra.ph":   "paragraph",
+		"dic.per.for.ate":    "perforate",
+		"dic.per.for.man.ce": "performance",
 	})
 }
 
 var _ = Describe("IOC registration", func() {
-
-	It("should parse empty config", func() {
-
-		config.SetTest(map[string]string{})
-
-		ioc.CallInjected(func(config NavConfig) {
-			Expect(config.Keys()).To(BeEmpty())
-		})
-
-	})
 
 	It("should parse complex config", func() {
 
@@ -44,11 +34,13 @@ var _ = Describe("IOC registration", func() {
 
 		ioc.CallInjected(func(config NavConfig) {
 
-			Expect(config.Keys()).To(Equal([]string{
+			dic := config.Child("dic")
+
+			Expect(dic.Keys()).To(Equal([]string{
 				"co", "con", "ga", "in", "pa", "per",
 			}))
 
-			con := config.Child("con")
+			con := dic.Child("con")
 			Expect(con.Keys()).To(Equal([]string{"fe", "fu"}))
 
 			confu := con.Child("fu")

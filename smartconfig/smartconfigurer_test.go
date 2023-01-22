@@ -53,9 +53,7 @@ var _ = Describe("Smart configuration", func() {
 	It("should accept simple string config", func() {
 
 		TestConfigure("my", &simple_config{})
-		config.SetTest(map[string]string{
-			"my.property": "Hello, World!",
-		})
+		config.Test("my.property", "Hello, World!")
 
 		ioc.CallInjected(func(injected *simple_config) {
 			Expect(injected).To(Equal(&simple_config{
@@ -69,9 +67,7 @@ var _ = Describe("Smart configuration", func() {
 
 		ioc.TestPut(alert_parser, func(Parser) {})
 		TestConfigure("threat", &parsed_config{})
-		config.SetTest(map[string]string{
-			"threat.level": "apocalypse",
-		})
+		config.Test("threat.level", "apocalypse")
 
 		ioc.CallInjected(func(injected *parsed_config) {
 			Expect(injected).To(Equal(&parsed_config{
@@ -84,7 +80,7 @@ var _ = Describe("Smart configuration", func() {
 	It("should configure a complex struct", func() {
 
 		TestConfigure("", &complex_root_config{})
-		config.SetTest(map[string]string{
+		config.TestMap(map[string]string{
 			"param1":       "great value",
 			"sub1.list.2":  "9",
 			"sub1.list.12": "8",

@@ -138,6 +138,10 @@ func createConfig(root string, configurable any) any {
 
 }
 
+func DefaultConfigure(root string, configurable any) {
+	ioc.DefaultPutFactory(createConfig(root, configurable))
+}
+
 func Configure(root string, configurable any) {
 	ioc.PutFactory(createConfig(root, configurable))
 }
