@@ -2,7 +2,7 @@
 
 ## What's Pigs?
 
-Pigs is a Go library for bootstrapping micro-service applications.
+Pigs is Go libraries for bootstrapping applications.
 
 ## Why Pigs?
 
@@ -34,24 +34,18 @@ with `<module>` the module you want to use.
 
 ## How's Pigs?
 
-Pigs is collection of small libraires exposed it in an IOC framework.
+Pigs is collection of small libraires exposed with an IOC framework.
 
 The librairies are:
 * ioc: The IOC framework. Completly written from scratch for the Pigs needs.
+* json: Because.
 * config: Configuration collector.
 * smartconf: Smart configuration caster.
-* log: logging for the win.
+* log: Logging for the win.
 
 ## When Pigs?
 
 TODO list:
-* [Logrus](https://github.com/sirupsen/logrus) integration
-* [Iris](https://github.com/kataras/iris) integration, with actuators:
-    * components: complete list of components in IOC module (?)
-    * env: complete configuration map
-    * health
-    * shutdown
 * Unix signal support
 * ApplicationContainer's life-cycle awareness
-* [Cobra](https://github.com/spf13/cobra) integration (Maybe)
 
