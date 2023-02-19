@@ -4,29 +4,29 @@ Yet another IOC framework.
 
 ## What's IOC?
 
-If you don't know what is IOC or DI, [this link](http://lmgtfy.com/?s=d&q=what%27s+inversion+of+control%3F) will change your life.
+If you don't know what is IOC or DI, [this link](https://letmegooglethat.com/?q=what+is+inversion+of+control) will change your life.
 
 ## Goals
 
 This framework has been written with some goals in mind:
-* No requirement for the components: third libraries can be injected quickly and nicely.
-* A strong typed support: you should never have to cast anything. Never.
-* A solution for cyclic dependencies: a component A which needs a component B which needs also the component A, that's not a problem of design, it's just the ruthless real world.
-* A support for tests. That means:
-    * the possibility to mock up a different environment for each unit test,
-    * the lazy loading of components, to load only what you want to test, for each unit test.
-* Auto-discovery, also known as voodoo origins.
+ * No requirement for the components: third libraries can be injected quickly and nicely.
+ * A strong typed support: you should never have to cast anything. Never.
+ * A solution for cyclic dependencies: a component A which needs a component B which needs also the component A, that's not a problem of design, it's just the ruthless real world.
+ * A support for tests. That means:
+   * the possibility to mock up a different environment for each unit test,
+   * the lazy loading of components, to load only what you want to test, for each unit test.
+ * Auto-discovery, also known as voodoo origins.
 
 And some goals are deliberated ignored:
-* No notion of scope: it's classical for IOC frameworks to include the notion of scope, which defines visibility and lifecycle of components (singleton, prototype...). But not here.
-* No integration with any web framework, but web framework can be nicely integrated in it.
-* No AOP support: voodoo is ok, but not satanism.
+ * No notion of extendable scope: it's classical for IOC frameworks to include the notion of scope, which defines visibility and lifecycle of components (singleton, prototype...). But not here. The framework defines a notion of scopes for a different goal (component definition precedence) and the user can not extend the pre-defined scopes.
+ * No integration with any web framework, but web framework can be nicely integrated in it.
+ * No AOP support: voodoo is ok, but not satanism.
 
 ## How it work
 
-### Container and component
+### Container and components
 
-A component is something: a struct, a pointer, a map, a chan, an integer... anything but `nil`. It's a variable that should be unique (singleton) and which will be injected in all other components that need it. Each component is defined by its type and optionally some _signatures_: some additional interfaces which are implemented by the component and declared when registering the component[^duck]. Multiple components can share the same type and signatures to enable auto-discovery, but that concept can be confusing and error-prone: it can be considered good practice to register each component with a specific and unique type, and using signatures only when auto-discovery is needed. Any component with a value `nil` will be silently discarded and never be injected in another comonent. This behaviour, together with auto-discovery and scopes features, helps implement conditional component creation.
+A component is something: a struct, a pointer, a map, a chan, an integer... It's a variable that should be unique (singleton) and which will be injected in all other components that need it. Each component is defined by its type and optionally some _signatures_: some additional interfaces which are implemented by the component and declared when registering the component[^duck]. Multiple components can share the same type and signatures to enable auto-discovery, but that concept can be confusing and error-prone: it can be considered good practice to register each component with a specific and unique type, and using signatures only when auto-discovery is needed. Any component with a value `nil` will be silently discarded and never be injected in another comonent. This behaviour, together with auto-discovery and scopes features, helps implement conditional component creation.
 
 A container is a set of components: it manages the lifecycle of each component and take in charge the injection process. The container is a managed component itself and can be injected in any component.
 
@@ -40,7 +40,7 @@ The framework is based on two types of injection: injection of (pointers to) str
 
 The framework can inject a structure, or rather a pointer to a structure.
 
-When the framework inject a structure, each field is observed, and only the fields tagged with `inject:""` are injected. The type of the field defines he component to inject. So if this variable `injected` is injected:
+When the framework inject a structure, only the fields tagged with `inject:""` are injected. The type of the field defines the component to inject. So if this variable `injected` is injected:
 ```go
 type MyInjectedStruct struct {
     NotInjected *NotInjected
@@ -58,7 +58,7 @@ At other points of the framework, the container use some user-defined functions,
 ```go
 func InjectedFunc(first mypkg.SomeInterface, second *anotherlib.RandomComponent) { ... }
 ```
-If the container calls the function, the first argument will be injected with a component with a type or signature `mypkg.SomeInterface`  and the second argument with a component with a type or signature `*anotherlib.RandomComponent`.
+If the container calls the function, the first argument will be injected with a component with a type or signature `mypkg.SomeInterface` and the second argument with a component with a type or signature `*anotherlib.RandomComponent`.
 
 Injected functions can take any number of input arguments, none included.
 
@@ -72,9 +72,9 @@ type MyInjectedStruct struct {
 
 var injected *MyInjectedStruct = &MyInjectedStruct{}
 ```
-Here, if `injected` is injected by the container, the field `AllComponents` will contains every components defined with the type or signature `SomeInterface`. The injected slice will never contain a `nil` value: `nil` components are discarded. If no component are found, the injected slice is empty. This feature can useful to implement an optional injection.
+Here, if `injected` is injected by the container, the field `AllComponents` will contains every components defined with the type or signature `SomeInterface`. The injected slice will never contain a `nil` value: `nil` components are discarded. If no component is found, the injected slice is empty. This feature can useful to implement an optional injection.
 
-#### Scopes: Default and Testing
+#### Scopes: Default, Core and Testing
 
 Like it's said in the main goals of the framework, there is no concept of scope, or at least not extendable scope. In fact, the container is divided in three set of components: one for the default components, one for the core components, and one for tests. Every time an injection is proceeded, the container start by searching any component in the test set. If nothing is found or if the components are `nil`, the container use the core set. If still nothing is found (or only `nil` components), then the container use the default set. In case of auto-discovery injection (slice), if at least one matching component is found in the test set, that components are injected and the components in the core set are not used (which also means if you have configured some components to be auto-discovered in the default or core scope, you can not run a test with the auto-discovered slice empty), and in the same spirit, if the core set is used and at least one component is found, the default set is ignored.
 
@@ -89,15 +89,15 @@ Last little trick: you can promote a component to a "superior" scope (a default 
 At least. After all these theoretical concepts, we will finally see the concrete part of the framework.
 
 The lifecycle of the container is going through several steps:
-* definition,
-* exploitation:
-  * for each necessary component:
-      * instantiation,
-      * injection,
-      * post-initialization,
-  * run main function
-  * close all closable component
-* redefinition (for tests)
+ * definition,
+ * exploitation:
+   * for each necessary component:
+     * instantiation,
+     * injection,
+     * post-initialization,
+   * run main function
+   * close all closable component
+ * redefinition (for tests)
 
 Let's see each steps in details.
 
@@ -157,7 +157,7 @@ func init() {
 
 Factories can not define cyclic dependencies (i.e. a factory produces a component `A` which is needed to another factory to create a component `B` which should be injected in the factory of `A`). To resolve the problem, you have to break the cycle, or wait another step in the component's lifecycle (like [Injection](#injection) or [Post-Initialization](#post-initialization)) to inject the required component.
 
-Like explain in the section [Scopes: Default and Testing](#scopes-default-and-testing), the functions `Put` and `PutFactory` define the component in the core set. The functions `DefaultPut` and `DefaultPutFactory` can be used in the same way to define a component in the default set, and the functions `TestPut` and `TestPutFactory` for the test set.
+Like explain in the section [Scopes: Default, Core and Testing](#scopes-default-core-and-testing), the functions `Put` and `PutFactory` define the component in the core set. The functions `DefaultPut` and `DefaultPutFactory` can be used in the same way to define a component in the default set, and the functions `TestPut` and `TestPutFactory` for the test set.
 
 Finaly, all this methods have their `Erroneous*` prefixed version (e.g. `ErroneousTestPut`) which doesn't panic but returns an error if something wrong happened.
 
@@ -199,7 +199,7 @@ If a factory return a not-null error, the container stops all the process as soo
 
 Regardless of the registration mode (instance or factory), if the component is a pointer to a structure, it is injected. The process is defined in the section [Injection of structures](#injection-of-structures).
 
-At this point, cyclic dependencies can be resolved.
+At this point, cyclic dependencies are not an issue anymore.
 
 ##### Post-Initialization
 

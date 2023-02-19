@@ -67,7 +67,7 @@ The `Configure` function take two inputs:
 func Configure(root string, configurable any)
 ```
 
- * A root path: for each configured field, the corresponding configuration key will be prefixed by this root path (except if the field is annoted with the tag `config` and the value of the tag starts with an `.`). This root path can be `""` (empty string).
+ * A `root` path: for each configured field, the corresponding configuration key will be prefixed by this root path (except if the field is annoted with the tag `config` and the value of the tag starts with an `.`). This root path can be `""` (empty string).
  * A pointer to a struct, which will be setted by the special configurer for struct. The function will register it as an ioc component.
 
 Two other functions, `DefaultConfigure` and `TestConfigure` are also defined to register the configuration struct in the default scope and in test scope of the ioc framework.

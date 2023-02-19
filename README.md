@@ -37,15 +37,15 @@ with `<module>` the module you want to use.
 Pigs is collection of small libraires exposed with an IOC framework.
 
 The librairies are:
-* ioc: The IOC framework. Completly written from scratch for the Pigs needs.
-* json: Because.
-* config: Configuration collector.
-* smartconf: Smart configuration caster.
-* log: Logging for the win.
+ * [ioc](ioc/README.md): The IOC framework. Completly written from scratch for the Pigs needs.
+ * [json](json/README.md): Because.
+ * [config](config/README.md): Configuration collector.
+ * [smartconfig](smartconfig/README.md): Smart configuration caster.
+ * [log](log/README.md): Logging for the win.
 
 ## When Pigs?
 
 TODO list:
-* Unix signal support
-* ApplicationContainer's life-cycle awareness
+ * Unix signal support
+ * ApplicationContainer's life-cycle awareness
 
