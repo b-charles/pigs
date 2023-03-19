@@ -2,7 +2,7 @@
 
 ## What's Pigs?
 
-Pigs is Go libraries for bootstrapping applications.
+Pigs is a Go module for bootstrapping applications.
 
 ## Why Pigs?
 
@@ -28,15 +28,14 @@ Because of [Pigs is Pigs](https://www.youtube.com/watch?v=GYXlF3sa9xs) very Gois
 
 You should be able to use Pigs with the `go get` command:
 ```
-$ go get github.com/b-charles/pigs/<module>
+$ go get github.com/b-charles/pigs
 ```
-with `<module>` the module you want to use.
 
 ## How's Pigs?
 
-Pigs is collection of small libraires exposed with an IOC framework.
+Pigs is collection of small packages exposed with an IOC framework.
 
-The librairies are:
+The packages are:
  * [ioc](ioc/README.md): The IOC framework. Completly written from scratch for the Pigs needs.
  * [json](json/README.md): Because.
  * [config](config/README.md): Configuration collector.

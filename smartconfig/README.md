@@ -4,25 +4,25 @@ Retrieve the configuration, but in a smart way.
 
 ## Why?
 
-You are using the [config](../config) module, but it's the twentieth times you've used `strconv.Atoi` to cast a string into your config struct? You are at the right place.
+You are using the [config](../config) package, but it's the twentieth times you've used `strconv.Atoi` to cast a string into your config struct? You are at the right place.
 
-This module is a sleight of hand: you give a prefix and a blank struct to the `Configure` function, and the struct is filled with the values from the config module and you can use it from the ioc framework as an injectable component. The fields of the struct can be something other than strings, the module defines and uses parsers to convert strings into the right type.
+This package is a sleight of hand: you give a prefix and a blank struct to the `Configure` function, and the struct is filled with the values from the config package and you can use it from the ioc framework as an injectable component. The fields of the struct can be something other than strings, the package defines and uses parsers to convert strings into the right type.
 
 ## How it works?
 
 ### Parsers
 
-First, before any configuration, the module get all `Parser`s components.
+First, before any configuration, the package get all `Parser`s components.
 
 A `Parser` is a function taking a string in input and returning the parsed value and an error:
 ```go
 type Parser func(string) (T, error)
 ```
-The module use the return type to know when the parser should be use. The functions `strconv.Atoi` and `strconv.ParseBool` are already defined as `Parser`s.
+The package use the return type to know when the parser should be use. The functions `strconv.Atoi` and `strconv.ParseBool` are already defined as `Parser`s.
 
 ### Configurers
 
-Parsers are kind but not very powerful. Sometimes you need to explore what configuration keys are available to construct the final value. The module defines the more flexible interface `Configurer`:
+Parsers are kind but not very powerful. Sometimes you need to explore what configuration keys are available to construct the final value. The package defines the more flexible interface `Configurer`:
 ```go
 type Configurer interface {
   Target() reflect.Type
@@ -50,11 +50,11 @@ The root node corresponds to the key `""` (empty string). The method `Get` diffe
 
 #### Struct
 
-The module handle structs and pointers to struct. Of course, the input of the method `Configure` should be a pointer so it has to be settable, and each field name should starts with an upper case for the same reason. Each field can be annoted with the tag `config` wich can defined the key to use (relative or absolute, see [the `Get` method of `NavConfig`](#configurers)). If no tag are found, the field name in lowercase is used as a relative sub key. The configurer search for each field which parser or configurer has to be used and can be called recursively.
+The package handle structs and pointers to struct. Of course, the input of the method `Configure` should be a pointer so it has to be settable, and each field name should starts with an upper case for the same reason. Each field can be annoted with the tag `config` wich can defined the key to use (relative or absolute, see [the `Get` method of `NavConfig`](#configurers)). If no tag are found, the field name in lowercase is used as a relative sub key. The configurer search for each field which parser or configurer has to be used and can be called recursively.
 
 #### Slices
 
-The module also handles slices. Available keys are sorted, integer numbers in numerical order first, then other keys in lexicographical order, and the same parser or configurer is used for each sub key found.
+The package also handles slices. Available keys are sorted, integer numbers in numerical order first, then other keys in lexicographical order, and the same parser or configurer is used for each sub key found.
 
 #### Maps
 

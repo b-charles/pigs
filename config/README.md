@@ -6,7 +6,7 @@ Configure the application.
 
 Hard-coding the configuration in your code is not a good idea. Many people have tried and they are unanimous: don't do it.
 
-There is different approach to configure your application: command line arguments, environment variables, configuration files in different format (properties, json, yaml, toml, ...) ... This module can be used to get all theses sources of configuration and merge them in an simple and [injectable](../ioc/README.md) component.
+There is different approach to configure your application: command line arguments, environment variables, configuration files in different format (properties, json, yaml, toml, ...) ... This package can be used to get all theses sources of configuration and merge them in an simple and [injectable](../ioc/README.md) component.
 
 ## What's supported?
 
@@ -14,7 +14,7 @@ For now, the framework supports command line arguments, environment variables, j
 
 ## How it works?
 
-The module defines two major structures: `ConfigSource` to handle a source of configuration, and `Configuration` to store the final merge of all sources.
+The package defines two major structures: `ConfigSource` to handle a source of configuration, and `Configuration` to store the final merge of all sources.
 
 ### The `ConfigSource`s
 
@@ -38,11 +38,11 @@ type MutableConfig interface {
 
 The priority returned by `GetPriority` is used to sort the sources: sources with lower priority will be called first and so sources with greater priority will be able to override values. The method `LoadEnv` records the variable defined by the source in the `MutableConfig` by the method `Set`. The `MutableConfig` other methods can be used to have a partial configuration and use the other sources to configure this source. The methods `Lookup` and `Get` returns value with resolved placeholders (see the section [The `Configuration` component](#the-configuration-component)).
 
-By simply defining a dependency on the config module will defines some default sources.
+The package defines some defaut sources.
 
 #### Default configuration source
 
-The default configuration source is build-in in the module and is not based on the `ConfigSource` interface. The default values are always loaded first.
+The default configuration source is build-in and is not based on the `ConfigSource` interface. The default values are always loaded first.
 
 To define a default value, simply use the method `Set` or `SetMap` in an init function:
 ```go
@@ -65,7 +65,7 @@ Default value should be defined once and can not be redefined.
 
 #### Test configuration source
 
-The module can also be used to define some values for unit tests. When using the functions `Test` or `TestMap`, a special component is created using the given map as a configuration source and defined in the test scope. Each call of `Test` or `TestMap` increase the priority of the generated component: which means you can override a configuration value:
+The package can also be used to define some values for unit tests. When using the functions `Test` or `TestMap`, a special component is created using the given map as a configuration source and defined in the test scope. Each call of `Test` or `TestMap` increase the priority of the generated component: which means you can override a configuration value:
 ```go
 
   config.TestMap(map[string]string{
@@ -128,5 +128,5 @@ The methods `Lookup` and `Get` resolve placeholders: for each value, each occura
 
 ## And now?
 
-The usage of this module should be efficient but not convenient. The module [smartconfig](../smartconfig/README.md) can be useful to get a chunck of typed configuration values.
+The usage of this package should be efficient but not convenient. The package [smartconfig](../smartconfig/README.md) can be useful to get a chunck of typed configuration values.
 
