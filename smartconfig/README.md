@@ -20,19 +20,13 @@ type Parser func(string) (T, error)
 ```
 The package use the return type to know when the parser should be use. The functions `strconv.Atoi` and `strconv.ParseBool` are already defined as `Parser`s.
 
-### Configurers
+### Inspectors
 
-Parsers are kind but not very powerful. Sometimes you need to explore what configuration keys are available to construct the final value. The package defines the more flexible interface `Configurer`:
+Parsers are kind but not very powerful. Sometimes you need to explore what configuration keys are available to construct the final value. The package defines the more flexible type `Inspector`:
 ```go
-type Configurer interface {
-  Target() reflect.Type
-  Configure(NavConfig, reflect.Value) error
-}
+type Inspector func(NavConfig) (T, error)
 ```
-
-The method `Target` returns what type the configurer is able to parse to. The method `Configure` does the job: the interface `NavConfig` is a wrapper of `config.Configuration` with some methods to _navigate_ in the keys (see below). The given `reflect.Value` is the receipient of the result of the parsing and the configurer should returns its parsing by using [the method `Set`](https://pkg.go.dev/reflect#Value.Set) of this value.
-
-The `NavConfig` interface represents the configuration as a tree. Each keys present in `config.Configuration` are split by the char `.` and each parts corresponds to a node in the tree. The interface defines methods to move around: get the current value, get the available sub keys, get the parent, a child node...
+Like for `Parser`, the function returns what type it is able to parse to. The main difference is that the function takes a `NavConfig` as input: `NavConfig` is an interface representing the configuration as a tree. Each keys present in `config.Configuration` are split by the char `.` and each parts corresponds to a node in the tree. The interface defines methods to move around: get the current value, get the available sub keys, get the parent, a child node...
 ```go
 type NavConfig interface {
   Root() NavConfig
@@ -50,7 +44,7 @@ The root node corresponds to the key `""` (empty string). The method `Get` diffe
 
 #### Struct
 
-The package handle structs and pointers to struct. Of course, the input of the method `Configure` should be a pointer so it has to be settable, and each field name should starts with an upper case for the same reason. Each field can be annoted with the tag `config` wich can defined the key to use (relative or absolute, see [the `Get` method of `NavConfig`](#configurers)). If no tag are found, the field name in lowercase is used as a relative sub key. The configurer search for each field which parser or configurer has to be used and can be called recursively.
+The package handle structs and pointers to struct. Of course, the input of the method `Configure` should be a pointer so it has to be settable, and each field name should starts with an upper case for the same reason. Each field can be annoted with the tag `config` wich can defined the key to use (relative or absolute, see [the `Get` method of `NavConfig`](#inspectors)). If no tag are found, the field name in lowercase is used as a relative sub key. The configurer search for each field which parser or configurer has to be used and can be called recursively.
 
 #### Slices
 
