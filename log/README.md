@@ -17,7 +17,7 @@ By default, a logger instance is already defined and can be used by any componen
 ```go
 
 type MyComponent struct {
-  logger log.Logger `inject:""`
+  Logger log.Logger `inject:""`
   ...
 }
 
@@ -25,7 +25,7 @@ func (my *MyComponent) doSomething( input string ) error {
 
   ...
 
-  my.log.Info()
+  my.Logger.Info()
     .Set("what", "I did something")
     .Set("with", input)
     .Log();
