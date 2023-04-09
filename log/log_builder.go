@@ -4,6 +4,7 @@ import "github.com/b-charles/pigs/json"
 
 type LogBuilder interface {
 	Set(path string, value any) LogBuilder
+	SetAll(map[string]any) LogBuilder
 	SetString(path string, value string) LogBuilder
 	SetFloat(path string, value float64) LogBuilder
 	SetInt(path string, value int) LogBuilder
@@ -27,6 +28,13 @@ func (self *logBuilderImpl) Set(path string, value any) LogBuilder {
 		panic(err)
 	} else {
 		self.builder.Set(path, node)
+	}
+	return self
+}
+
+func (self *logBuilderImpl) SetAll(values map[string]any) LogBuilder {
+	for path, value := range values {
+		self.Set(path, value)
 	}
 	return self
 }
@@ -78,6 +86,10 @@ func (self *logBuilderImpl) Log() {
 type logBuilderNull struct{}
 
 func (self *logBuilderNull) Set(path string, value any) LogBuilder {
+	return self
+}
+
+func (self *logBuilderNull) SetAll(map[string]any) LogBuilder {
 	return self
 }
 
