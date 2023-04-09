@@ -13,6 +13,18 @@ func testMarshall(jsons Jsons, value any, expected string) {
 	Expect(node.String()).WithOffset(1).To(Equal(expected))
 }
 
+type doer interface {
+	Do() string
+}
+
+type doer_impl struct {
+	value string
+}
+
+func (self *doer_impl) Do() string {
+	return self.value
+}
+
 var _ = Describe("Json marshallers", func() {
 
 	BeforeEach(func() {
@@ -79,6 +91,20 @@ var _ = Describe("Json marshallers", func() {
 			testMarshall(jsons,
 				completeStruct{[]string{"Wild Cherry", "Play That Funky Music"}, map[string]int{"Daft Punk": 2}},
 				`{"Slice":["Wild Cherry","Play That Funky Music"],"Map":{"Daft Punk":2}}`)
+		})
+
+	})
+
+	It("should marshall interfaces", func() {
+
+		ioc.TestPut(func(v doer) (JsonNode, error) {
+			return JsonString(v.Do()), nil
+		}, func(JsonMarshaller) {})
+
+		ioc.CallInjected(func(jsons Jsons) {
+			testMarshall(jsons,
+				&doer_impl{"Starlight - The Supermen Lovers"},
+				`"Starlight - The Supermen Lovers"`)
 		})
 
 	})

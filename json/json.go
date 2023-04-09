@@ -21,8 +21,9 @@ type Jsons interface {
 }
 
 type JsonMapper struct {
-	marshallers   map[reflect.Type]*jsonValueMarshaller
-	unmarshallers map[reflect.Type]*jsonValueUnmarshaller
+	marshallers     map[reflect.Type]*jsonValueMarshaller
+	int_marshallers map[reflect.Type]*jsonValueMarshaller
+	unmarshallers   map[reflect.Type]*jsonValueUnmarshaller
 }
 
 func typeComp(t1, t2 reflect.Type) int {
@@ -100,11 +101,16 @@ func (self *JsonMapper) String() string {
 func (self *JsonMapper) PostInit(marshallers []JsonMarshaller, unmarshallers []JsonUnmarshaller) error {
 
 	self.marshallers = map[reflect.Type]*jsonValueMarshaller{}
+	self.int_marshallers = map[reflect.Type]*jsonValueMarshaller{}
 	for _, marshaller := range marshallers {
 		if target, value, err := valueMarshaller(marshaller); err != nil {
 			return fmt.Errorf("Error during registring %v as a JsonMarshaller: %w", marshaller, err)
 		} else {
-			self.marshallers[target] = value
+			if target.Kind() == reflect.Interface {
+				self.int_marshallers[target] = value
+			} else {
+				self.marshallers[target] = value
+			}
 		}
 	}
 
@@ -125,6 +131,13 @@ func (self *JsonMapper) getMarshaller(target reflect.Type) (*jsonValueMarshaller
 
 	if marshaller, ok := self.marshallers[target]; ok {
 		return marshaller, nil
+	}
+
+	for t, marshaller := range self.int_marshallers {
+		if target.Implements(t) {
+			self.marshallers[target] = marshaller
+			return marshaller, nil
+		}
 	}
 
 	if target.Kind() == reflect.Pointer {
@@ -207,7 +220,7 @@ func (self *JsonMapper) getUnmarshaller(target reflect.Type) (*jsonValueUnmarsha
 		unmarshaller := &jsonValueUnmarshaller{}
 		self.unmarshallers[target] = unmarshaller
 		if err := newPointerUnmarshaller(self, target, unmarshaller); err != nil {
-			delete(self.marshallers, target)
+			delete(self.unmarshallers, target)
 			return nil, err
 		} else {
 			return unmarshaller, nil
@@ -218,7 +231,7 @@ func (self *JsonMapper) getUnmarshaller(target reflect.Type) (*jsonValueUnmarsha
 		unmarshaller := &jsonValueUnmarshaller{}
 		self.unmarshallers[target] = unmarshaller
 		if err := newStructUnmarshaller(self, target, unmarshaller); err != nil {
-			delete(self.marshallers, target)
+			delete(self.unmarshallers, target)
 			return nil, err
 		} else {
 			return unmarshaller, nil
@@ -229,7 +242,7 @@ func (self *JsonMapper) getUnmarshaller(target reflect.Type) (*jsonValueUnmarsha
 		unmarshaller := &jsonValueUnmarshaller{}
 		self.unmarshallers[target] = unmarshaller
 		if err := newSliceUnmarshaller(self, target, unmarshaller); err != nil {
-			delete(self.marshallers, target)
+			delete(self.unmarshallers, target)
 			return nil, err
 		} else {
 			return unmarshaller, nil
@@ -240,7 +253,7 @@ func (self *JsonMapper) getUnmarshaller(target reflect.Type) (*jsonValueUnmarsha
 		unmarshaller := &jsonValueUnmarshaller{}
 		self.unmarshallers[target] = unmarshaller
 		if err := newMapUnMarshaller(self, target, unmarshaller); err != nil {
-			delete(self.marshallers, target)
+			delete(self.unmarshallers, target)
 			return nil, err
 		} else {
 			return unmarshaller, nil

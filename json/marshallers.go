@@ -27,7 +27,35 @@ func init() {
 		return JsonBool(v), nil
 	}, func(JsonMarshaller) {})
 
-	ioc.Put(func(v JsonNode) (JsonNode, error) {
+	ioc.Put(func(v error) (JsonNode, error) {
+		return JsonString(v.Error()), nil
+	}, func(JsonMarshaller) {})
+
+	ioc.Put(func(v JsonString) (JsonNode, error) {
+		return v, nil
+	}, func(JsonMarshaller) {})
+
+	ioc.Put(func(v JsonFloat) (JsonNode, error) {
+		return v, nil
+	}, func(JsonMarshaller) {})
+
+	ioc.Put(func(v JsonInt) (JsonNode, error) {
+		return v, nil
+	}, func(JsonMarshaller) {})
+
+	ioc.Put(func(v JsonBool) (JsonNode, error) {
+		return v, nil
+	}, func(JsonMarshaller) {})
+
+	ioc.Put(func(v *JsonObject) (JsonNode, error) {
+		return v, nil
+	}, func(JsonMarshaller) {})
+
+	ioc.Put(func(v *JsonArray) (JsonNode, error) {
+		return v, nil
+	}, func(JsonMarshaller) {})
+
+	ioc.Put(func(v JsonNull) (JsonNode, error) {
 		return v, nil
 	}, func(JsonMarshaller) {})
 
