@@ -3,7 +3,7 @@ package json_test
 import (
 	"github.com/b-charles/pigs/ioc"
 	. "github.com/b-charles/pigs/json"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 

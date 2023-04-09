@@ -114,7 +114,7 @@ type Looping struct {
 
 // Ordered
 
-type Ordered interface {
+type OrderedComp interface {
 	Name() string
 }
 
@@ -127,11 +127,11 @@ func NewOrderRegister() *OrderRegister {
 	return &OrderRegister{make([]string, 0), make([]string, 0)}
 }
 
-func (self *OrderRegister) registerPostInit(obj Ordered) {
+func (self *OrderRegister) registerPostInit(obj OrderedComp) {
 	self.PostInitOrder = append(self.PostInitOrder, obj.Name())
 }
 
-func (self *OrderRegister) registerClose(obj Ordered) error {
+func (self *OrderRegister) registerClose(obj OrderedComp) error {
 	self.CloseOrder = append(self.CloseOrder, obj.Name())
 	return nil
 }

@@ -4,7 +4,7 @@ import (
 	"github.com/b-charles/pigs/config"
 	"github.com/b-charles/pigs/ioc"
 	. "github.com/b-charles/pigs/smartconfig"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
