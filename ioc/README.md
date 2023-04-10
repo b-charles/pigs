@@ -191,9 +191,9 @@ During the call of `CallInjected`, the instance of some components will be requi
 
 ##### Instantiation
 
-Of course, the first step is to create an instance. If the component has been defined with the functions `Put` or `TestPut`, the instance is directly used. If the component has been defined with a factory, with the function `PutFactory` or `TestPutFactory`, the factory is called with its argument injected.
+Of course, the first step is to create an instance. If the component has been defined with the functions `DefaultPut`, `Put` or `TestPut`, the instance is directly used. If the component has been defined with a factory, with the function `DefaultPutFactory`, `PutFactory` or `TestPutFactory`, the factory is called with its argument injected. See [the scope section](#scopes-default-core-and-testing) to know how the scope is choosed.
 
-If a factory return a not-null error, the container stops all the process as soon as possible and return the error wrapped in some context messages.
+If a factory return a not-null error, the container stops all the process as soon as possible and return the error wrapped in some context message.
 
 ##### Injection
 

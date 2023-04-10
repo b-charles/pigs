@@ -14,16 +14,39 @@ func testMarshall(jsons Jsons, value any, expected string) {
 }
 
 type doer interface {
-	Do() string
+	Do()
 }
 
-type doer_impl struct {
-	value string
+type doer_impl struct{}
+
+func (self *doer_impl) Do() {}
+
+type dodoer interface {
+	Do()
+	DoDo()
 }
 
-func (self *doer_impl) Do() string {
-	return self.value
+type dodoInh interface {
+	doer
+	DoDo()
 }
+
+type dodoer_impl struct{}
+
+func (self *dodoer_impl) Do()   {}
+func (self *dodoer_impl) DoDo() {}
+
+type dododoer interface {
+	Do()
+	DoDo()
+	DoDoDo()
+}
+
+type dododoer_impl struct{}
+
+func (self *dododoer_impl) Do()     {}
+func (self *dododoer_impl) DoDo()   {}
+func (self *dododoer_impl) DoDoDo() {}
 
 var _ = Describe("Json marshallers", func() {
 
@@ -98,13 +121,50 @@ var _ = Describe("Json marshallers", func() {
 	It("should marshall interfaces", func() {
 
 		ioc.TestPut(func(v doer) (JsonNode, error) {
-			return JsonString(v.Do()), nil
+			return JsonString("Do"), nil
 		}, func(JsonMarshaller) {})
 
 		ioc.CallInjected(func(jsons Jsons) {
-			testMarshall(jsons,
-				&doer_impl{"Starlight - The Supermen Lovers"},
-				`"Starlight - The Supermen Lovers"`)
+			testMarshall(jsons, &doer_impl{}, `"Do"`)
+		})
+
+	})
+
+	It("should choose wisely the correct marshaller in case of inheritance", func() {
+
+		ioc.TestPut(func(v doer) (JsonNode, error) {
+			return JsonString("Do"), nil
+		}, func(JsonMarshaller) {})
+
+		ioc.TestPut(func(v dodoInh) (JsonNode, error) {
+			return JsonString("DoDo"), nil
+		}, func(JsonMarshaller) {})
+
+		ioc.CallInjected(func(jsons Jsons) {
+			testMarshall(jsons, &doer_impl{}, `"Do"`)
+			testMarshall(jsons, &dodoer_impl{}, `"DoDo"`)
+		})
+
+	})
+
+	It("should choose wisely the correct marshaller in case of interface overlap", func() {
+
+		ioc.TestPut(func(v dodoer) (JsonNode, error) {
+			return JsonString("DoDo"), nil
+		}, func(JsonMarshaller) {})
+
+		ioc.TestPut(func(v dododoer) (JsonNode, error) {
+			return JsonString("DoDoDo"), nil
+		}, func(JsonMarshaller) {})
+
+		ioc.TestPut(func(v doer) (JsonNode, error) {
+			return JsonString("Do"), nil
+		}, func(JsonMarshaller) {})
+
+		ioc.CallInjected(func(jsons Jsons) {
+			testMarshall(jsons, &doer_impl{}, `"Do"`)
+			testMarshall(jsons, &dodoer_impl{}, `"DoDo"`)
+			testMarshall(jsons, &dododoer_impl{}, `"DoDoDo"`)
 		})
 
 	})

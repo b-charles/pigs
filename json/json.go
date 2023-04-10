@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"strings"
 
 	"github.com/b-charles/pigs/ioc"
 )
@@ -21,9 +20,9 @@ type Jsons interface {
 }
 
 type JsonMapper struct {
-	marshallers     map[reflect.Type]*jsonValueMarshaller
-	int_marshallers map[reflect.Type]*jsonValueMarshaller
-	unmarshallers   map[reflect.Type]*jsonValueUnmarshaller
+	marshallers     map[reflect.Type]*wrappedMarshaller
+	int_marshallers []*wrappedMarshaller
+	unmarshallers   map[reflect.Type]*wrappedUnmarshaller
 }
 
 func typeComp(t1, t2 reflect.Type) int {
@@ -50,76 +49,139 @@ func typeComp(t1, t2 reflect.Type) int {
 	}
 }
 
-func sortedKeys[T any](m map[reflect.Type]T) []string {
+func sortByKeys[T any](m map[reflect.Type]T) []T {
 
 	l := len(m)
 
-	sorted := make([]reflect.Type, 0, l)
+	types := make([]reflect.Type, 0, l)
 	for k := range m {
-		sorted = append(sorted, k)
+		types = append(types, k)
 	}
 
-	sort.Slice(sorted, func(i, j int) bool {
-		return typeComp(sorted[i], sorted[j]) < 0
+	sort.Slice(types, func(i, j int) bool {
+		return typeComp(types[i], types[j]) < 0
 	})
 
-	strs := make([]string, l)
-	for i, t := range sorted {
-		strs[i] = t.String()
+	sorted := make([]T, 0, l)
+	for _, t := range types {
+		sorted = append(sorted, m[t])
 	}
 
-	return strs
+	return sorted
+
+}
+
+func (self *JsonMapper) JsonNode() JsonNode {
+
+	b := NewJsonBuilder()
+
+	b.SetEmptyObject("marshallers")
+	for _, m := range sortByKeys(self.marshallers) {
+		b.SetString(fmt.Sprintf("marshallers.%s", m.t.String()), m.String())
+	}
+
+	b.SetEmptyObject("interface_marshallers")
+	for _, m := range self.int_marshallers {
+		b.SetString(fmt.Sprintf("interface_marshallers.%s", m.t.String()), m.String())
+	}
+
+	b.SetEmptyObject("unmarshallers")
+	for _, m := range sortByKeys(self.unmarshallers) {
+		b.SetString(fmt.Sprintf("unmarshallers.%s", m.t.String()), m.String())
+	}
+
+	return b.Build()
 
 }
 
 func (self *JsonMapper) String() string {
+	return self.JsonNode().String()
+}
 
-	var b strings.Builder
+func (self *JsonMapper) insertIntWrappedMarshaller(wrapped *wrappedMarshaller) error {
 
-	b.WriteString("[ marshallers:")
-	for i, t := range sortedKeys(self.marshallers) {
-		if i > 0 {
-			b.WriteString(",")
+	target := wrapped.t
+
+	for i, m := range self.int_marshallers {
+
+		if target == m.t {
+			return fmt.Errorf("Marshaller %v already defined for type %v.", m, m.t)
+		} else if target.Implements(m.t) {
+
+			if m.t.Implements(target) {
+				return fmt.Errorf("Interfaces %v and %v (marshalled by %v) are identical.", target, m, m.t)
+			}
+
+			self.int_marshallers = append(self.int_marshallers[:i+1], self.int_marshallers[i:]...)
+			self.int_marshallers[i] = wrapped
+			return nil
+
 		}
-		b.WriteString(t)
 	}
 
-	b.WriteString(" unmarshallers:")
-	for i, t := range sortedKeys(self.unmarshallers) {
-		if i > 0 {
-			b.WriteString(",")
+	self.int_marshallers = append(self.int_marshallers, wrapped)
+	return nil
+
+}
+
+func (self *JsonMapper) insertMarshaller(marshaller JsonMarshaller) error {
+
+	if wrapped, err := wrapMarshaller(marshaller); err != nil {
+		return err
+	} else {
+
+		target := wrapped.t
+		if target.Kind() == reflect.Interface {
+
+			return self.insertIntWrappedMarshaller(wrapped)
+
+		} else {
+
+			if m, ok := self.marshallers[target]; ok {
+				return fmt.Errorf("Marshaller %v already defined for type %v.", m, target)
+			}
+			self.marshallers[target] = wrapped
+
 		}
-		b.WriteString(t)
+
 	}
 
-	b.WriteString(" ]")
+	return nil
 
-	return b.String()
+}
+
+func (self *JsonMapper) insertUnmarshaller(unmarshaller JsonUnmarshaller) error {
+
+	if wrapped, err := wrapUnmarshaller(unmarshaller); err != nil {
+		return err
+	} else {
+
+		target := wrapped.t
+		if m, ok := self.unmarshallers[target]; ok {
+			return fmt.Errorf("Unmarshaller %v already defined for type %v.", m, target)
+		}
+		self.unmarshallers[target] = wrapped
+
+	}
+
+	return nil
 
 }
 
 func (self *JsonMapper) PostInit(marshallers []JsonMarshaller, unmarshallers []JsonUnmarshaller) error {
 
-	self.marshallers = map[reflect.Type]*jsonValueMarshaller{}
-	self.int_marshallers = map[reflect.Type]*jsonValueMarshaller{}
+	self.marshallers = map[reflect.Type]*wrappedMarshaller{}
+	self.int_marshallers = make([]*wrappedMarshaller, 0)
 	for _, marshaller := range marshallers {
-		if target, value, err := valueMarshaller(marshaller); err != nil {
+		if err := self.insertMarshaller(marshaller); err != nil {
 			return fmt.Errorf("Error during registring %v as a JsonMarshaller: %w", marshaller, err)
-		} else {
-			if target.Kind() == reflect.Interface {
-				self.int_marshallers[target] = value
-			} else {
-				self.marshallers[target] = value
-			}
 		}
 	}
 
-	self.unmarshallers = map[reflect.Type]*jsonValueUnmarshaller{}
+	self.unmarshallers = map[reflect.Type]*wrappedUnmarshaller{}
 	for _, unmarshaller := range unmarshallers {
-		if target, value, err := valueUnmarshaller(unmarshaller); err != nil {
+		if err := self.insertUnmarshaller(unmarshaller); err != nil {
 			return fmt.Errorf("Error during registring %v as a JsonUnmarshaller: %w", unmarshaller, err)
-		} else {
-			self.unmarshallers[target] = value
 		}
 	}
 
@@ -127,21 +189,21 @@ func (self *JsonMapper) PostInit(marshallers []JsonMarshaller, unmarshallers []J
 
 }
 
-func (self *JsonMapper) getMarshaller(target reflect.Type) (*jsonValueMarshaller, error) {
+func (self *JsonMapper) getMarshaller(target reflect.Type) (*wrappedMarshaller, error) {
 
 	if marshaller, ok := self.marshallers[target]; ok {
 		return marshaller, nil
 	}
 
-	for t, marshaller := range self.int_marshallers {
-		if target.Implements(t) {
+	for _, marshaller := range self.int_marshallers {
+		if target.Implements(marshaller.t) {
 			self.marshallers[target] = marshaller
 			return marshaller, nil
 		}
 	}
 
 	if target.Kind() == reflect.Pointer {
-		marshaller := &jsonValueMarshaller{}
+		marshaller := &wrappedMarshaller{}
 		self.marshallers[target] = marshaller
 		if err := newPointerMarshaller(self, target, marshaller); err != nil {
 			delete(self.marshallers, target)
@@ -152,7 +214,7 @@ func (self *JsonMapper) getMarshaller(target reflect.Type) (*jsonValueMarshaller
 	}
 
 	if target.Kind() == reflect.Struct {
-		marshaller := &jsonValueMarshaller{}
+		marshaller := &wrappedMarshaller{}
 		self.marshallers[target] = marshaller
 		if err := newStructMarshaller(self, target, marshaller); err != nil {
 			delete(self.marshallers, target)
@@ -163,7 +225,7 @@ func (self *JsonMapper) getMarshaller(target reflect.Type) (*jsonValueMarshaller
 	}
 
 	if target.Kind() == reflect.Slice {
-		marshaller := &jsonValueMarshaller{}
+		marshaller := &wrappedMarshaller{}
 		self.marshallers[target] = marshaller
 		if err := newSliceMarshaller(self, target, marshaller); err != nil {
 			delete(self.marshallers, target)
@@ -174,7 +236,7 @@ func (self *JsonMapper) getMarshaller(target reflect.Type) (*jsonValueMarshaller
 	}
 
 	if target.Kind() == reflect.Map && target.Key() == stringType {
-		marshaller := &jsonValueMarshaller{}
+		marshaller := &wrappedMarshaller{}
 		self.marshallers[target] = marshaller
 		if err := newMapMarshaller(self, target, marshaller); err != nil {
 			delete(self.marshallers, target)
@@ -210,14 +272,14 @@ func (self *JsonMapper) MarshalToString(value any) (string, error) {
 	}
 }
 
-func (self *JsonMapper) getUnmarshaller(target reflect.Type) (*jsonValueUnmarshaller, error) {
+func (self *JsonMapper) getUnmarshaller(target reflect.Type) (*wrappedUnmarshaller, error) {
 
 	if unmarshaller, ok := self.unmarshallers[target]; ok {
 		return unmarshaller, nil
 	}
 
 	if target.Kind() == reflect.Pointer {
-		unmarshaller := &jsonValueUnmarshaller{}
+		unmarshaller := &wrappedUnmarshaller{}
 		self.unmarshallers[target] = unmarshaller
 		if err := newPointerUnmarshaller(self, target, unmarshaller); err != nil {
 			delete(self.unmarshallers, target)
@@ -228,7 +290,7 @@ func (self *JsonMapper) getUnmarshaller(target reflect.Type) (*jsonValueUnmarsha
 	}
 
 	if target.Kind() == reflect.Struct {
-		unmarshaller := &jsonValueUnmarshaller{}
+		unmarshaller := &wrappedUnmarshaller{}
 		self.unmarshallers[target] = unmarshaller
 		if err := newStructUnmarshaller(self, target, unmarshaller); err != nil {
 			delete(self.unmarshallers, target)
@@ -239,7 +301,7 @@ func (self *JsonMapper) getUnmarshaller(target reflect.Type) (*jsonValueUnmarsha
 	}
 
 	if target.Kind() == reflect.Slice {
-		unmarshaller := &jsonValueUnmarshaller{}
+		unmarshaller := &wrappedUnmarshaller{}
 		self.unmarshallers[target] = unmarshaller
 		if err := newSliceUnmarshaller(self, target, unmarshaller); err != nil {
 			delete(self.unmarshallers, target)
@@ -250,7 +312,7 @@ func (self *JsonMapper) getUnmarshaller(target reflect.Type) (*jsonValueUnmarsha
 	}
 
 	if target.Kind() == reflect.Map && target.Key() == stringType {
-		unmarshaller := &jsonValueUnmarshaller{}
+		unmarshaller := &wrappedUnmarshaller{}
 		self.unmarshallers[target] = unmarshaller
 		if err := newMapUnMarshaller(self, target, unmarshaller); err != nil {
 			delete(self.unmarshallers, target)
@@ -295,7 +357,13 @@ func (self *JsonMapper) UnmarshalFromString(str string, callback any) error {
 }
 
 func init() {
+
 	ioc.PutFactory(func() (*JsonMapper, error) {
 		return &JsonMapper{}, nil
 	}, func(Jsons) {})
+
+	ioc.Put(func(jsonMapper *JsonMapper) (JsonNode, error) {
+		return jsonMapper.JsonNode(), nil
+	}, func(JsonMarshaller) {})
+
 }

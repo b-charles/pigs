@@ -1,6 +1,7 @@
 package json
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -9,9 +10,15 @@ import (
 
 // Defaults unmarshallers
 
+type StringUnmarshaller func(JsonNode) (string, error)
+type Float64Unmarshaller func(JsonNode) (float64, error)
+type IntUnmarshaller func(JsonNode) (int, error)
+type BoolUnmarshaller func(JsonNode) (bool, error)
+type ErrorUnmarshaller func(JsonNode) (error, error)
+
 func init() {
 
-	ioc.Put(func(json JsonNode) (string, error) {
+	ioc.DefaultPut(func(json JsonNode) (string, error) {
 		if json.IsNull() {
 			return "", nil
 		} else if !json.IsString() {
@@ -19,9 +26,10 @@ func init() {
 		} else {
 			return json.AsString(), nil
 		}
-	}, func(JsonUnmarshaller) {})
+	}, func(StringUnmarshaller) {})
+	ioc.PutFactory(func(u StringUnmarshaller) (JsonUnmarshaller, error) { return u, nil })
 
-	ioc.Put(func(json JsonNode) (float64, error) {
+	ioc.DefaultPut(func(json JsonNode) (float64, error) {
 		if json.IsNull() {
 			return 0, nil
 		} else if !json.IsFloat() {
@@ -29,9 +37,10 @@ func init() {
 		} else {
 			return json.AsFloat(), nil
 		}
-	}, func(JsonUnmarshaller) {})
+	}, func(Float64Unmarshaller) {})
+	ioc.PutFactory(func(u Float64Unmarshaller) (JsonUnmarshaller, error) { return u, nil })
 
-	ioc.Put(func(json JsonNode) (int, error) {
+	ioc.DefaultPut(func(json JsonNode) (int, error) {
 		if json.IsNull() {
 			return 0, nil
 		} else if !json.IsInt() {
@@ -39,9 +48,10 @@ func init() {
 		} else {
 			return json.AsInt(), nil
 		}
-	}, func(JsonUnmarshaller) {})
+	}, func(IntUnmarshaller) {})
+	ioc.PutFactory(func(u IntUnmarshaller) (JsonUnmarshaller, error) { return u, nil })
 
-	ioc.Put(func(json JsonNode) (bool, error) {
+	ioc.DefaultPut(func(json JsonNode) (bool, error) {
 		if json.IsNull() {
 			return false, nil
 		} else if !json.IsBool() {
@@ -49,7 +59,19 @@ func init() {
 		} else {
 			return json.AsBool(), nil
 		}
-	}, func(JsonUnmarshaller) {})
+	}, func(BoolUnmarshaller) {})
+	ioc.PutFactory(func(u BoolUnmarshaller) (JsonUnmarshaller, error) { return u, nil })
+
+	ioc.DefaultPut(func(json JsonNode) (error, error) {
+		if json.IsNull() {
+			return nil, nil
+		} else if !json.IsString() {
+			return nil, fmt.Errorf("Can not parse json %v as an error.", json)
+		} else {
+			return errors.New(json.AsString()), nil
+		}
+	}, func(ErrorUnmarshaller) {})
+	ioc.PutFactory(func(u ErrorUnmarshaller) (JsonUnmarshaller, error) { return u, nil })
 
 	ioc.Put(func(json JsonNode) (JsonNode, error) {
 		return json, nil
@@ -59,7 +81,7 @@ func init() {
 
 // Pointer unmarshaller
 
-func newPointerUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarshaller *jsonValueUnmarshaller) error {
+func newPointerUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarshaller *wrappedUnmarshaller) error {
 
 	if target.Kind() != reflect.Pointer {
 		return fmt.Errorf("The target %v is not a pointer.", target)
@@ -84,7 +106,7 @@ func newPointerUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmars
 
 // Struct unmarshaller
 
-func newStructUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarshaller *jsonValueUnmarshaller) error {
+func newStructUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarshaller *wrappedUnmarshaller) error {
 
 	if target.Kind() != reflect.Struct {
 		return fmt.Errorf("The target %v is not a struct.", target)
@@ -143,7 +165,7 @@ func newStructUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarsh
 
 // Slice unmarshaller
 
-func newSliceUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarshaller *jsonValueUnmarshaller) error {
+func newSliceUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarshaller *wrappedUnmarshaller) error {
 
 	if target.Kind() != reflect.Slice {
 		return fmt.Errorf("The target %v is not a slice.", target)
@@ -182,7 +204,7 @@ func newSliceUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarsha
 
 // Map unmarshaller
 
-func newMapUnMarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarshaller *jsonValueUnmarshaller) error {
+func newMapUnMarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarshaller *wrappedUnmarshaller) error {
 
 	if target.Kind() != reflect.Map {
 		return fmt.Errorf("The target %v is not a map.", target)

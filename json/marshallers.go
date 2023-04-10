@@ -9,27 +9,44 @@ import (
 
 // Defaults marshallers
 
+type StringMarshaller func(v string) (JsonNode, error)
+type Float64Marshaller func(v float64) (JsonNode, error)
+type IntMarshaller func(v int) (JsonNode, error)
+type BoolMarshaller func(v bool) (JsonNode, error)
+type ErrorMarshaller func(v error) (JsonNode, error)
+
 func init() {
 
-	ioc.Put(func(v string) (JsonNode, error) {
+	ioc.DefaultPut(func(v string) (JsonNode, error) {
 		return JsonString(v), nil
-	}, func(JsonMarshaller) {})
+	}, func(StringMarshaller) {})
+	ioc.PutFactory(func(m StringMarshaller) (JsonMarshaller, error) { return m, nil })
 
-	ioc.Put(func(v float64) (JsonNode, error) {
+	ioc.DefaultPut(func(v float64) (JsonNode, error) {
 		return JsonFloat(v), nil
-	}, func(JsonMarshaller) {})
+	}, func(Float64Marshaller) {})
+	ioc.PutFactory(func(m Float64Marshaller) (JsonMarshaller, error) { return m, nil })
 
-	ioc.Put(func(v int) (JsonNode, error) {
+	ioc.DefaultPut(func(v int) (JsonNode, error) {
 		return JsonInt(v), nil
-	}, func(JsonMarshaller) {})
+	}, func(IntMarshaller) {})
+	ioc.PutFactory(func(m IntMarshaller) (JsonMarshaller, error) { return m, nil })
 
-	ioc.Put(func(v bool) (JsonNode, error) {
+	ioc.DefaultPut(func(v bool) (JsonNode, error) {
 		return JsonBool(v), nil
-	}, func(JsonMarshaller) {})
+	}, func(BoolMarshaller) {})
+	ioc.PutFactory(func(m BoolMarshaller) (JsonMarshaller, error) { return m, nil })
 
-	ioc.Put(func(v error) (JsonNode, error) {
+	ioc.DefaultPut(func(v error) (JsonNode, error) {
 		return JsonString(v.Error()), nil
-	}, func(JsonMarshaller) {})
+	}, func(ErrorMarshaller) {})
+	ioc.PutFactory(func(m ErrorMarshaller) (JsonMarshaller, error) { return m, nil })
+
+}
+
+// Marshallers of JsonNode implementations
+
+func init() {
 
 	ioc.Put(func(v JsonString) (JsonNode, error) {
 		return v, nil
@@ -63,7 +80,7 @@ func init() {
 
 // Pointer marshaller
 
-func newPointerMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller *jsonValueMarshaller) error {
+func newPointerMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller *wrappedMarshaller) error {
 
 	if target.Kind() != reflect.Pointer {
 		return fmt.Errorf("The target %v is not a pointer.", target)
@@ -86,7 +103,7 @@ func newPointerMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshall
 
 // Struct marshaller
 
-func newStructMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller *jsonValueMarshaller) error {
+func newStructMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller *wrappedMarshaller) error {
 
 	if target.Kind() != reflect.Struct {
 		return fmt.Errorf("The target %v is not a struct.", target)
@@ -144,7 +161,7 @@ func newStructMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshalle
 
 // Slice marshaller
 
-func newSliceMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller *jsonValueMarshaller) error {
+func newSliceMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller *wrappedMarshaller) error {
 
 	if target.Kind() != reflect.Slice {
 		return fmt.Errorf("The target %v is not a slice.", target)
@@ -172,7 +189,7 @@ func newSliceMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller
 
 // Map marshaller
 
-func newMapMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller *jsonValueMarshaller) error {
+func newMapMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller *wrappedMarshaller) error {
 
 	if target.Kind() != reflect.Map {
 		return fmt.Errorf("The target %v is not a map.", target)

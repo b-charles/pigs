@@ -8,21 +8,27 @@ import (
 // type JsonMarshaller func(T) (JsonNode, error)
 type JsonMarshaller any
 
-type jsonValueMarshaller struct {
-	f func(reflect.Value) (JsonNode, error)
+type wrappedMarshaller struct {
+	src JsonMarshaller
+	t   reflect.Type
+	f   func(reflect.Value) (JsonNode, error)
 }
 
-func valueMarshaller(marshaller JsonMarshaller) (reflect.Type, *jsonValueMarshaller, error) {
+func (self *wrappedMarshaller) String() string {
+	return fmt.Sprint(self.src)
+}
+
+func wrapMarshaller(marshaller JsonMarshaller) (*wrappedMarshaller, error) {
 
 	v := reflect.ValueOf(marshaller)
 	t := v.Type()
 
 	if t.Kind() != reflect.Func {
-		return nil, nil, fmt.Errorf("Invalid marshaller: %v is not a function.", v)
+		return nil, fmt.Errorf("Invalid marshaller: %v is not a function.", v)
 	} else if t.NumIn() != 1 {
-		return nil, nil, fmt.Errorf("Invalid marshaller (wrong inputs): %v, expected func(T) (JsonNode, error)", t)
+		return nil, fmt.Errorf("Invalid marshaller (wrong inputs): %v, expected func(T) (JsonNode, error)", t)
 	} else if t.NumOut() != 2 || t.Out(0) != jsonType || !t.Out(1).AssignableTo(errorType) {
-		return nil, nil, fmt.Errorf("Invalid marshaller (wrong outputs): %v, expected func(T) (JsonNode, error)", t)
+		return nil, fmt.Errorf("Invalid marshaller (wrong outputs): %v, expected func(T) (JsonNode, error)", t)
 	}
 
 	f := func(value reflect.Value) (JsonNode, error) {
@@ -34,6 +40,6 @@ func valueMarshaller(marshaller JsonMarshaller) (reflect.Type, *jsonValueMarshal
 		}
 	}
 
-	return t.In(0), &jsonValueMarshaller{f}, nil
+	return &wrappedMarshaller{marshaller, t.In(0), f}, nil
 
 }
