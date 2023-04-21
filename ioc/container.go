@@ -7,12 +7,14 @@ import (
 	"time"
 )
 
-type scope uint
+var error_type = reflect.TypeOf(func(error) {}).In(0)
+
+type Scope uint
 
 const (
-	def scope = iota
-	core
-	test
+	Def Scope = iota
+	Core
+	Test
 )
 
 // A Container is a set of components. It manages the lifecycle of each
@@ -31,18 +33,15 @@ type Container struct {
 func NewContainer() *Container {
 
 	container := &Container{
-		defaultComponents: make(map[reflect.Type][]*component),
-		coreComponents:    make(map[reflect.Type][]*component),
-		testComponents:    make(map[reflect.Type][]*component),
+		defaultComponents: make(map[reflect.Type][]*component, 100),
+		coreComponents:    make(map[reflect.Type][]*component, 100),
+		testComponents:    make(map[reflect.Type][]*component, 10),
 		creationTime:      time.Now(),
-		instances:         map[*component]*instance{},
-		closables:         []*instance{}}
+		instances:         make(map[*component]*instance, 100),
+		closables:         make([]*instance, 0, 100),
+	}
 
-	container.PutFactory(func() (*Container, error) {
-		return container, nil
-	})
-
-	container.PutFactory(func() (*ContainerStatus, error) {
+	container.RegisterFactory(Core, "ContainerStatus", func() (*ContainerStatus, error) {
 		return &ContainerStatus{
 			container: container,
 		}, nil
@@ -60,25 +59,25 @@ func (self *Container) CreationTime() time.Time {
 
 // REGISTRATION
 
-// putIn creates a new component by its factory, signature functions
-// (sigWrappers) and in the given scope.
-func (self *Container) putIn(factory reflect.Value, sigWrappers []any, scope scope) error {
+// register records a component in the given scope by its name, its value, its factory and
+// signature functions. At least one of the arguments 'value' or 'factory' should be nil.
+func (self *Container) register(scope Scope, name string, value any, factory any, signFuncs []any) error {
 
-	components := self.getComponentMap(scope)
-
-	comp, err := newComponent(self, scope, factory, sigWrappers)
-	if err != nil {
+	if comp, err := newComponent(name, value, factory, signFuncs); err != nil {
 		return err
-	}
+	} else {
 
-	for _, sign := range comp.signatures {
+		components := self.getComponentMap(scope)
 
-		list, ok := components[sign]
-		if !ok {
-			list = make([]*component, 0)
+		for _, sign := range comp.signatures {
+			if list, ok := components[sign]; !ok {
+				list = make([]*component, 1, 5)
+				list[0] = comp
+				components[sign] = list
+			} else {
+				components[sign] = append(list, comp)
+			}
 		}
-
-		components[sign] = append(list, comp)
 
 	}
 
@@ -86,95 +85,40 @@ func (self *Container) putIn(factory reflect.Value, sigWrappers []any, scope sco
 
 }
 
-// wrap converts a component into a factory which returns this component.
-func wrap(component any) reflect.Value {
-
-	value := reflect.ValueOf(component)
-
-	out := []reflect.Type{reflect.TypeOf(component), error_type}
-
-	wTyp := reflect.FuncOf([]reflect.Type{}, out, false)
-	wVal := reflect.MakeFunc(wTyp, func(args []reflect.Value) []reflect.Value {
-		return []reflect.Value{value, reflect.Zero(error_type)}
-	})
-
-	return wVal
-
+// RegisterComponent creates a new component in the given scope by its name,
+// value and signature functions.
+func (self *Container) RegisterComponent(scope Scope, name string, value any, signFuncs ...any) error {
+	return self.register(scope, name, value, nil, signFuncs)
 }
 
-// DefaultPutFactory records a default component defined by a factory and
-// optional signatures.
-func (self *Container) DefaultPutFactory(factory any, signFuncs ...any) error {
-	if factory == nil {
-		return nil
-	}
-	return self.putIn(reflect.ValueOf(factory), signFuncs, def)
-}
-
-// DefaultPut records directly a default component with optional signatures.
-func (self *Container) DefaultPut(component any, signFuncs ...any) error {
-	if component == nil {
-		return nil
-	}
-	return self.putIn(wrap(component), signFuncs, def)
-}
-
-// PutFactory records a component defined by a factory and optional
-// signatures.
-func (self *Container) PutFactory(factory any, signFuncs ...any) error {
-	if factory == nil {
-		return nil
-	}
-	return self.putIn(reflect.ValueOf(factory), signFuncs, core)
-}
-
-// Put records directly a component with optional signatures.
-func (self *Container) Put(component any, signFuncs ...any) error {
-	if component == nil {
-		return nil
-	}
-	return self.putIn(wrap(component), signFuncs, core)
-}
-
-// TestPutFactory records a test component defined by a factory and
-// optional signatures.
-func (self *Container) TestPutFactory(factory any, signFuncs ...any) error {
-	if factory == nil {
-		return nil
-	}
-	return self.putIn(reflect.ValueOf(factory), signFuncs, test)
-}
-
-// TestPut records directly a test component with optional signatures.
-func (self *Container) TestPut(component any, signFuncs ...any) error {
-	if component == nil {
-		return nil
-	}
-	return self.putIn(wrap(component), signFuncs, test)
+// RegisterFactory creates a new component in the given scope by its name, factory and
+// signature functions.
+func (self *Container) RegisterFactory(scope Scope, name string, factory any, signFuncs ...any) error {
+	return self.register(scope, name, nil, factory, signFuncs)
 }
 
 // INTERNAL RESOLUTION
 
-// instanciates gets the instance of the given component. If the instance is
+// instanciate gets the instance of the given component. If the instance is
 // already created, the instance is returned. If not, the instance is created,
 // recorded, initialized, post-initialized and returned.
-func (self *Container) instanciates(component *component, stack *componentStack) (*instance, error) {
+func (self *Container) instanciate(component *component, stack *componentStack) (*instance, error) {
 
 	if instance, ok := self.instances[component]; ok {
 		return instance, nil
 	}
 
-	instance, err := component.instanciate(stack)
+	instance, err := newInstance(self, component, stack)
 	if err != nil {
 		return nil, err
 	}
 
 	self.instances[component] = instance
 
-	if err := instance.initialize(stack); err != nil {
+	if err := instance.initialize(self, stack); err != nil {
 		return instance, err
 	}
-	if err := instance.postInit(stack); err != nil {
+	if err := instance.postInit(self, stack); err != nil {
 		return instance, err
 	}
 
@@ -187,12 +131,12 @@ func (self *Container) instanciates(component *component, stack *componentStack)
 }
 
 // getComponentMap gets the map corresponding to the given scope.
-func (self *Container) getComponentMap(scope scope) map[reflect.Type][]*component {
-	if scope == core {
+func (self *Container) getComponentMap(scope Scope) map[reflect.Type][]*component {
+	if scope == Core {
 		return self.coreComponents
-	} else if scope == def {
+	} else if scope == Def {
 		return self.defaultComponents
-	} else if scope == test {
+	} else if scope == Test {
 		return self.testComponents
 	} else {
 		panic(fmt.Errorf("Unknown scope %v", scope))
@@ -211,20 +155,20 @@ func (self *Container) getInstances(typ reflect.Type, stack *componentStack) ([]
 
 		for _, component := range list {
 
-			if instance, err := self.instanciates(component, stack); err != nil {
+			if instance, err := self.instanciate(component, stack); err != nil {
 
 				// try core and default if direct cyclic dependency
 				if isDirectCyclicError(err) {
 
 					if list, ok := self.coreComponents[typ]; ok && len(list) == 1 {
-						if coreInstance, coreErr := self.instanciates(list[0], stack); coreErr == nil {
+						if coreInstance, coreErr := self.instanciate(list[0], stack); coreErr == nil {
 							instances = append(instances, coreInstance)
 							continue
 						}
 					}
 
 					if list, ok := self.defaultComponents[typ]; ok && len(list) == 1 {
-						if defaultInstance, defaultErr := self.instanciates(list[0], stack); defaultErr == nil {
+						if defaultInstance, defaultErr := self.instanciate(list[0], stack); defaultErr == nil {
 							instances = append(instances, defaultInstance)
 							continue
 						}
@@ -256,13 +200,13 @@ func (self *Container) getInstances(typ reflect.Type, stack *componentStack) ([]
 
 		for _, component := range list {
 
-			if instance, err := self.instanciates(component, stack); err != nil {
+			if instance, err := self.instanciate(component, stack); err != nil {
 
 				// try default if direct cyclic dependency
 				if isDirectCyclicError(err) {
 
 					if list, ok := self.defaultComponents[typ]; ok && len(list) == 1 {
-						if defaultInstance, defaultErr := self.instanciates(list[0], stack); defaultErr == nil {
+						if defaultInstance, defaultErr := self.instanciate(list[0], stack); defaultErr == nil {
 							instances = append(instances, defaultInstance)
 							continue
 						}
@@ -294,7 +238,7 @@ func (self *Container) getInstances(typ reflect.Type, stack *componentStack) ([]
 
 		for _, component := range list {
 
-			if instance, err := self.instanciates(component, stack); err != nil {
+			if instance, err := self.instanciate(component, stack); err != nil {
 				return nil, err
 			} else if !instance.isNil() {
 				instances = append(instances, instance)
@@ -351,12 +295,12 @@ func (self *Container) getValue(target reflect.Type, stack *componentStack) (ref
 
 	} else if len(instances) > 1 {
 
-		producers := make([]*component, 0)
+		components := make([]*component, 0)
 		for _, instance := range instances {
-			producers = append(producers, instance.producer)
+			components = append(components, instance.component)
 		}
 
-		return reflect.Zero(target), fmt.Errorf("Too many components found: %v.", producers)
+		return reflect.Zero(target), fmt.Errorf("Too many components found: %v.", components)
 
 	} else if len(instances) == 0 {
 
@@ -417,7 +361,7 @@ func (self *Container) callInjected(method reflect.Value, stack *componentStack)
 func (self *Container) isInTestEnv() (bool, error) {
 	for _, components := range self.testComponents {
 		for _, comp := range components {
-			if instance, err := self.instanciates(comp, newComponentStack()); err != nil {
+			if instance, err := self.instanciate(comp, newComponentStack()); err != nil {
 				return false, err
 			} else if !instance.isNil() {
 				return true, nil

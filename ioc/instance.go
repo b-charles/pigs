@@ -6,16 +6,52 @@ import (
 	"reflect"
 )
 
-// instance represents a component instance. It's created by the factory of the
-// component.
+// instance represents a component instance.
 type instance struct {
-	producer *component
-	value    reflect.Value
+	component *component
+	value     reflect.Value
+}
+
+// newInstance returns an instance of the component.
+func newInstance(container *Container, component *component, stack *componentStack) (*instance, error) {
+
+	if err := stack.push(component); err != nil {
+		return nil, err
+	}
+	defer stack.pop(component)
+
+	if component.factory.IsValid() {
+
+		outs, err := container.callInjected(component.factory, stack)
+
+		if err != nil {
+			return nil, fmt.Errorf("Error during call of factory of '%v': %w", component, err)
+		} else if len(outs) == 2 && !outs[1].IsNil() {
+			return nil, fmt.Errorf("Error during instanciation of '%v': %w", component, outs[1].Interface().(error))
+		}
+
+		value := outs[0]
+		if value.IsValid() && value.Kind() == reflect.Interface {
+			value = value.Elem()
+		}
+
+		return &instance{component, value}, nil
+
+	} else if component.value.IsValid() {
+
+		return &instance{component, component.value}, nil
+
+	} else {
+
+		return &instance{component, component.value}, nil
+
+	}
+
 }
 
 func (self *instance) isNil() bool {
 
-	if self == nil {
+	if !self.value.IsValid() {
 		return true
 	}
 
@@ -38,7 +74,7 @@ func (self *instance) isNil() bool {
 
 // initialize initializes the instance: if the instance is a struct or a
 // pointer to a struct, each tagged 'inject' field is injected.
-func (self *instance) initialize(stack *componentStack) error {
+func (self *instance) initialize(container *Container, stack *componentStack) error {
 
 	if self.isNil() {
 		return nil
@@ -63,7 +99,7 @@ func (self *instance) initialize(stack *componentStack) error {
 			continue
 		} else if !field.CanSet() {
 			return fmt.Errorf("The field '%v' of %v is not settable.", structField.Name, self)
-		} else if fieldValue, err := self.producer.container.getValue(structField.Type, stack); err != nil {
+		} else if fieldValue, err := container.getValue(structField.Type, stack); err != nil {
 			return fmt.Errorf("Can not inject field '%v': %w", structField.Name, err)
 		} else {
 			field.Set(fieldValue)
@@ -76,7 +112,7 @@ func (self *instance) initialize(stack *componentStack) error {
 }
 
 // postInit call the PostInit method (if defined).
-func (self *instance) postInit(stack *componentStack) error {
+func (self *instance) postInit(container *Container, stack *componentStack) error {
 
 	if self.isNil() {
 		return nil
@@ -87,7 +123,7 @@ func (self *instance) postInit(stack *componentStack) error {
 		return nil
 	}
 
-	if out, err := self.producer.container.callInjected(postInit, stack); err != nil {
+	if out, err := container.callInjected(postInit, stack); err != nil {
 
 		return fmt.Errorf("Error during PostInit call of '%v': %w", self, err)
 

@@ -17,15 +17,15 @@ var _ = Describe("IOC registration", func() {
 	Describe("with default factory", func() {
 
 		It("should register", func() {
-			Expect(container.DefaultPutFactory(SimpleFactory("A"))).To(Succeed())
+			Expect(container.RegisterFactory(Def, "A", SimpleFactory("A"))).To(Succeed())
 		})
 
 		It("should register with signatures", func() {
-			Expect(container.DefaultPutFactory(SimpleFactory("A"), func(Doer, BigDoer) {})).To(Succeed())
+			Expect(container.RegisterFactory(Def, "A", SimpleFactory("A"), func(Doer, BigDoer) {})).To(Succeed())
 		})
 
 		It("should not register with incorrect signature", func() {
-			Expect(container.DefaultPutFactory(SimpleFactory("A"), func(NotDoer) {})).To(HaveOccurred())
+			Expect(container.RegisterFactory(Def, "A", SimpleFactory("A"), func(NotDoer) {})).To(HaveOccurred())
 		})
 
 	})
@@ -33,15 +33,15 @@ var _ = Describe("IOC registration", func() {
 	Describe("with instanciated default component", func() {
 
 		It("should register", func() {
-			Expect(container.DefaultPut(&Simple{"A"})).To(Succeed())
+			Expect(container.RegisterComponent(Def, "A", &Simple{"A"})).To(Succeed())
 		})
 
 		It("should register with signatures", func() {
-			Expect(container.DefaultPut(&Simple{"A"}, func(Doer, BigDoer) {})).To(Succeed())
+			Expect(container.RegisterComponent(Def, "A", &Simple{"A"}, func(Doer, BigDoer) {})).To(Succeed())
 		})
 
 		It("should not register with incorrect signature", func() {
-			Expect(container.DefaultPut(&Simple{"A"}, func(NotDoer) {})).To(HaveOccurred())
+			Expect(container.RegisterComponent(Def, "A", &Simple{"A"}, func(NotDoer) {})).To(HaveOccurred())
 		})
 
 	})
@@ -49,15 +49,15 @@ var _ = Describe("IOC registration", func() {
 	Describe("with factory", func() {
 
 		It("should register", func() {
-			Expect(container.PutFactory(SimpleFactory("A"))).To(Succeed())
+			Expect(container.RegisterFactory(Core, "A", SimpleFactory("A"))).To(Succeed())
 		})
 
 		It("should register with signatures", func() {
-			Expect(container.PutFactory(SimpleFactory("A"), func(Doer, BigDoer) {})).To(Succeed())
+			Expect(container.RegisterFactory(Core, "A", SimpleFactory("A"), func(Doer, BigDoer) {})).To(Succeed())
 		})
 
 		It("should not register with incorrect signature", func() {
-			Expect(container.PutFactory(SimpleFactory("A"), func(NotDoer) {})).To(HaveOccurred())
+			Expect(container.RegisterFactory(Core, "A", SimpleFactory("A"), func(NotDoer) {})).To(HaveOccurred())
 		})
 
 	})
@@ -65,15 +65,15 @@ var _ = Describe("IOC registration", func() {
 	Describe("with instanciated component", func() {
 
 		It("should register", func() {
-			Expect(container.Put(&Simple{"A"})).To(Succeed())
+			Expect(container.RegisterComponent(Core, "A", &Simple{"A"})).To(Succeed())
 		})
 
 		It("should register with signatures", func() {
-			Expect(container.Put(&Simple{"A"}, func(Doer, BigDoer) {})).To(Succeed())
+			Expect(container.RegisterComponent(Core, "A", &Simple{"A"}, func(Doer, BigDoer) {})).To(Succeed())
 		})
 
 		It("should not register with incorrect signature", func() {
-			Expect(container.Put(&Simple{"A"}, func(NotDoer) {})).To(HaveOccurred())
+			Expect(container.RegisterComponent(Core, "A", &Simple{"A"}, func(NotDoer) {})).To(HaveOccurred())
 		})
 
 	})
@@ -81,15 +81,15 @@ var _ = Describe("IOC registration", func() {
 	Describe("with test factory", func() {
 
 		It("should register", func() {
-			Expect(container.TestPutFactory(SimpleFactory("A"))).To(Succeed())
+			Expect(container.RegisterFactory(Test, "A", SimpleFactory("A"))).To(Succeed())
 		})
 
 		It("should register with signatures", func() {
-			Expect(container.TestPutFactory(SimpleFactory("A"), func(Doer, BigDoer) {})).To(Succeed())
+			Expect(container.RegisterFactory(Test, "A", SimpleFactory("A"), func(Doer, BigDoer) {})).To(Succeed())
 		})
 
 		It("should not register with incorrect signature", func() {
-			Expect(container.TestPutFactory(SimpleFactory("A"), func(NotDoer) {})).To(HaveOccurred())
+			Expect(container.RegisterFactory(Test, "A", SimpleFactory("A"), func(NotDoer) {})).To(HaveOccurred())
 		})
 
 	})
@@ -97,15 +97,15 @@ var _ = Describe("IOC registration", func() {
 	Describe("with instanciated test component", func() {
 
 		It("should register", func() {
-			Expect(container.TestPut(&Simple{"A"})).To(Succeed())
+			Expect(container.RegisterComponent(Test, "A", &Simple{"A"})).To(Succeed())
 		})
 
 		It("should register with signatures", func() {
-			Expect(container.TestPut(&Simple{"A"}, func(Doer, BigDoer) {})).To(Succeed())
+			Expect(container.RegisterComponent(Test, "A", &Simple{"A"}, func(Doer, BigDoer) {})).To(Succeed())
 		})
 
 		It("should not register with incorrect signature", func() {
-			Expect(container.TestPut(&Simple{"A"}, func(NotDoer) {})).To(HaveOccurred())
+			Expect(container.RegisterComponent(Test, "A", &Simple{"A"}, func(NotDoer) {})).To(HaveOccurred())
 		})
 
 	})

@@ -26,17 +26,6 @@ var _ = Describe("IOC call", func() {
 
 	Describe("with simple injection", func() {
 
-		It("should be able to inject itself", func() {
-
-			called := false
-			Expect(container.CallInjected(func(injected *Container) {
-				called = true
-				Expect(injected).To(Equal(container))
-			})).To(Succeed())
-			Expect(called).To(BeTrue())
-
-		})
-
 		It("should be able to inject status", func() {
 
 			called := false
@@ -50,7 +39,7 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject a simple component", func() {
 
-			container.PutFactory(SimpleFactory("A"))
+			container.RegisterFactory(Core, "A", SimpleFactory("A"))
 
 			called := false
 			Expect(container.CallInjected(func(a *Simple) {
@@ -63,8 +52,8 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject two simple components", func() {
 
-			container.PutFactory(SimpleFactory("A"))
-			container.PutFactory(TrivialFactory("B"))
+			container.RegisterFactory(Core, "A", SimpleFactory("A"))
+			container.RegisterFactory(Core, "B", TrivialFactory("B"))
 
 			called := false
 			Expect(container.CallInjected(func(a *Simple, b Trivial) {
@@ -78,7 +67,7 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject default component if nothing is provided", func() {
 
-			container.DefaultPutFactory(SimpleFactory("DEFAULT"))
+			container.RegisterFactory(Def, "DEFAULT", SimpleFactory("DEFAULT"))
 
 			called := false
 			Expect(container.CallInjected(func(a *Simple) {
@@ -91,8 +80,8 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject default component if default component is nil", func() {
 
-			container.DefaultPutFactory(SimpleFactory("DEFAULT"))
-			container.PutFactory(func() *Simple { return nil })
+			container.RegisterFactory(Def, "DEFAULT", SimpleFactory("DEFAULT"))
+			container.RegisterFactory(Core, "NIL", func() *Simple { return nil })
 
 			called := false
 			Expect(container.CallInjected(func(a *Simple) {
@@ -105,8 +94,8 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject core component even if default component is provided", func() {
 
-			container.DefaultPutFactory(SimpleFactory("DEFAULT"))
-			container.PutFactory(SimpleFactory("A"))
+			container.RegisterFactory(Def, "DEFAULT", SimpleFactory("DEFAULT"))
+			container.RegisterFactory(Core, "A", SimpleFactory("A"))
 
 			called := false
 			Expect(container.CallInjected(func(a *Simple) {
@@ -119,8 +108,8 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject core component if test component is nil", func() {
 
-			container.PutFactory(SimpleFactory("A"))
-			container.TestPutFactory(func() *Simple { return nil })
+			container.RegisterFactory(Core, "A", SimpleFactory("A"))
+			container.RegisterFactory(Test, "NIL", func() *Simple { return nil })
 
 			called := false
 			Expect(container.CallInjected(func(a *Simple) {
@@ -133,8 +122,8 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject test component if provided", func() {
 
-			container.PutFactory(SimpleFactory("A"))
-			container.TestPutFactory(SimpleFactory("TEST"))
+			container.RegisterFactory(Core, "A", SimpleFactory("A"))
+			container.RegisterFactory(Test, "TEST", SimpleFactory("TEST"))
 
 			called := false
 			Expect(container.CallInjected(func(a *Simple) {
@@ -154,7 +143,7 @@ var _ = Describe("IOC call", func() {
 
 		It("should return an error if the only component is nil", func() {
 
-			container.PutFactory(func() *Simple { return nil })
+			container.RegisterFactory(Core, "NIL", func() *Simple { return nil })
 
 			Expect(container.CallInjected(func(a *Simple) {
 			})).To(HaveOccurred())
@@ -163,8 +152,8 @@ var _ = Describe("IOC call", func() {
 
 		It("should return an error if too many components are provided", func() {
 
-			container.PutFactory(SimpleFactory("A1"))
-			container.PutFactory(SimpleFactory("A2"))
+			container.RegisterFactory(Core, "A1", SimpleFactory("A1"))
+			container.RegisterFactory(Core, "A2", SimpleFactory("A2"))
 
 			Expect(container.CallInjected(func(a *Simple) {
 			})).To(HaveOccurred())
@@ -173,7 +162,7 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject an interface", func() {
 
-			container.PutFactory(SimpleFactory("A"), func(Doer) {})
+			container.RegisterFactory(Core, "A", SimpleFactory("A"), func(Doer) {})
 
 			called := false
 			Expect(container.CallInjected(func(a Doer) {
@@ -186,7 +175,7 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject not a struct", func() {
 
-			container.PutFactory(TrivialFactory("A"), func(Doer) {})
+			container.RegisterFactory(Core, "A", TrivialFactory("A"), func(Doer) {})
 
 			called := false
 			Expect(container.CallInjected(func(a Doer) {
@@ -199,8 +188,8 @@ var _ = Describe("IOC call", func() {
 
 		It("should restore 'core' configuration after a CallInjected", func() {
 
-			container.PutFactory(SimpleFactory("A"), func(Doer) {})
-			container.TestPutFactory(SimpleFactory("TEST"), func(Doer) {})
+			container.RegisterFactory(Core, "A", SimpleFactory("A"), func(Doer) {})
+			container.RegisterFactory(Test, "TEST", SimpleFactory("TEST"), func(Doer) {})
 
 			// test
 
@@ -228,9 +217,9 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject a slice of pointers", func() {
 
-			container.PutFactory(SimpleFactory("A1"))
-			container.PutFactory(SimpleFactory("A2"))
-			container.PutFactory(SimpleFactory("A3"))
+			container.RegisterFactory(Core, "A1", SimpleFactory("A1"))
+			container.RegisterFactory(Core, "A2", SimpleFactory("A2"))
+			container.RegisterFactory(Core, "A3", SimpleFactory("A3"))
 
 			called := false
 			Expect(container.CallInjected(func(slice []*Simple) {
@@ -246,9 +235,9 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject a slice with discarding nil components", func() {
 
-			container.PutFactory(SimpleFactory("A1"))
-			container.PutFactory(func() *Simple { return nil })
-			container.PutFactory(SimpleFactory("A3"))
+			container.RegisterFactory(Core, "A1", SimpleFactory("A1"))
+			container.RegisterFactory(Core, "NIL", func() *Simple { return nil })
+			container.RegisterFactory(Core, "A3", SimpleFactory("A3"))
 
 			called := false
 			Expect(container.CallInjected(func(slice []*Simple) {
@@ -263,8 +252,8 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject an empty slice if all components are nil", func() {
 
-			container.PutFactory(func() *Simple { return nil })
-			container.PutFactory(func() *Simple { return nil })
+			container.RegisterFactory(Core, "NIL1", func() *Simple { return nil })
+			container.RegisterFactory(Core, "NIL2", func() *Simple { return nil })
 
 			called := false
 			Expect(container.CallInjected(func(slice []*Simple) {
@@ -277,9 +266,9 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject a slice of interface", func() {
 
-			container.PutFactory(SimpleFactory("A1"), func(Doer) {})
-			container.PutFactory(SimpleFactory("A2"), func(Doer) {})
-			container.PutFactory(SimpleFactory("A3"), func(Doer) {})
+			container.RegisterFactory(Core, "A1", SimpleFactory("A1"), func(Doer) {})
+			container.RegisterFactory(Core, "A2", SimpleFactory("A2"), func(Doer) {})
+			container.RegisterFactory(Core, "A3", SimpleFactory("A3"), func(Doer) {})
 
 			called := false
 			Expect(container.CallInjected(func(slice []Doer) {
@@ -295,9 +284,9 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject a slice of interface (mixed)", func() {
 
-			container.PutFactory(SimpleFactory("A1"), func(Doer) {})
-			container.PutFactory(TrivialFactory("T2"), func(Doer) {})
-			container.PutFactory(SimpleFactory("A2"), func(Doer) {})
+			container.RegisterFactory(Core, "A1", SimpleFactory("A1"), func(Doer) {})
+			container.RegisterFactory(Core, "T2", TrivialFactory("T2"), func(Doer) {})
+			container.RegisterFactory(Core, "A2", SimpleFactory("A2"), func(Doer) {})
 
 			called := false
 			Expect(container.CallInjected(func(slice []Doer) {
@@ -324,11 +313,11 @@ var _ = Describe("IOC call", func() {
 
 		It("should inject only test components", func() {
 
-			container.PutFactory(SimpleFactory("A1"))
-			container.PutFactory(SimpleFactory("A2"))
-			container.PutFactory(SimpleFactory("A3"))
+			container.RegisterFactory(Core, "A1", SimpleFactory("A1"))
+			container.RegisterFactory(Core, "A2", SimpleFactory("A2"))
+			container.RegisterFactory(Core, "A3", SimpleFactory("A3"))
 
-			container.TestPutFactory(SimpleFactory("TEST"))
+			container.RegisterFactory(Test, "TEST", SimpleFactory("TEST"))
 
 			called := false
 			Expect(container.CallInjected(func(slice []*Simple) {

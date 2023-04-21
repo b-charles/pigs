@@ -18,9 +18,9 @@ var _ = Describe("IOC factory", func() {
 
 		It("should create a component with dependency (factory)", func() {
 
-			container.PutFactory(SimpleFactory("A"))
+			container.RegisterFactory(Core, "A", SimpleFactory("A"))
 
-			container.PutFactory(InjectedFactory)
+			container.RegisterFactory(Core, "INJECTED", InjectedFactory)
 
 			container.CallInjected(func(injected *Injected) {
 				Expect(injected).To(Equal(&Injected{&Simple{"A"}}))
@@ -30,9 +30,9 @@ var _ = Describe("IOC factory", func() {
 
 		It("should create a component with dependency (init)", func() {
 
-			container.PutFactory(SimpleFactory("A"))
+			container.RegisterFactory(Core, "A", SimpleFactory("A"))
 
-			container.Put(&Initialized{})
+			container.RegisterComponent(Core, "INJECTED", &Initialized{})
 
 			container.CallInjected(func(injected *Initialized) {
 				Expect(injected).To(Equal(&Initialized{&Simple{"A"}}))
@@ -42,9 +42,9 @@ var _ = Describe("IOC factory", func() {
 
 		It("should create a component with dependency (postInit)", func() {
 
-			container.PutFactory(SimpleFactory("A"))
+			container.RegisterFactory(Core, "A", SimpleFactory("A"))
 
-			container.Put(&PostInitialized{})
+			container.RegisterComponent(Core, "INJECTED", &PostInitialized{})
 
 			container.CallInjected(func(injected *PostInitialized) {
 				Expect(injected).To(Equal(&PostInitialized{&Simple{"A"}}))
@@ -54,10 +54,10 @@ var _ = Describe("IOC factory", func() {
 
 		It("should inject test component if provided", func() {
 
-			container.PutFactory(SimpleFactory("A"))
-			container.TestPutFactory(SimpleFactory("TEST"))
+			container.RegisterFactory(Core, "A", SimpleFactory("A"))
+			container.RegisterFactory(Test, "TEST", SimpleFactory("TEST"))
 
-			container.PutFactory(InjectedFactory)
+			container.RegisterFactory(Core, "INJECTED", InjectedFactory)
 
 			container.CallInjected(func(injected *Injected) {
 				Expect(injected).To(Equal(&Injected{&Simple{"TEST"}}))
@@ -67,7 +67,7 @@ var _ = Describe("IOC factory", func() {
 
 		It("should return an error if no component is provided", func() {
 
-			container.PutFactory(InjectedFactory)
+			container.RegisterFactory(Core, "INJECTED", InjectedFactory)
 
 			Expect(container.CallInjected(func(injected *Injected) {})).To(HaveOccurred())
 
@@ -75,10 +75,10 @@ var _ = Describe("IOC factory", func() {
 
 		It("should return an error if too many components are provided", func() {
 
-			container.PutFactory(SimpleFactory("A1"))
-			container.PutFactory(SimpleFactory("A2"))
+			container.RegisterFactory(Core, "A1", SimpleFactory("A1"))
+			container.RegisterFactory(Core, "A2", SimpleFactory("A2"))
 
-			container.PutFactory(InjectedFactory)
+			container.RegisterFactory(Core, "INJECTED", InjectedFactory)
 
 			Expect(container.CallInjected(func(injected *Injected) {})).To(HaveOccurred())
 
@@ -86,7 +86,7 @@ var _ = Describe("IOC factory", func() {
 
 		It("should inject the component in itself", func() {
 
-			container.Put(&Looping{})
+			container.RegisterComponent(Core, "LOOPING", &Looping{})
 
 			Expect(container.CallInjected(func(injected *Looping) {
 				Expect(injected).To(Equal(injected.Looping))
@@ -96,7 +96,7 @@ var _ = Describe("IOC factory", func() {
 
 		It("should throw an error if a cyclic dependency is detected", func() {
 
-			container.PutFactory(func(looping *Looping) *Looping {
+			container.RegisterFactory(Core, "LOOPING", func(looping *Looping) *Looping {
 				return &Looping{looping}
 			})
 
@@ -108,10 +108,10 @@ var _ = Describe("IOC factory", func() {
 
 		It("should be possible to promote a core component to test", func() {
 
-			container.PutFactory(SimpleFactory("A1"))
-			container.TestPutFactory(func(a1 *Simple) *Simple { return a1 })
+			container.RegisterFactory(Core, "A1", SimpleFactory("A1"))
+			container.RegisterFactory(Test, "PROM", func(a1 *Simple) *Simple { return a1 })
 
-			container.Put(&SliceInjected{})
+			container.RegisterComponent(Core, "INJECTED", &SliceInjected{})
 
 			Expect(container.CallInjected(func(injected *SliceInjected) {
 				Expect(injected.Simple).To(ConsistOf(&Simple{"A1"}))
@@ -125,9 +125,9 @@ var _ = Describe("IOC factory", func() {
 
 		It("should create a component with dependency (factory)", func() {
 
-			container.PutFactory(SimpleFactory("A"))
+			container.RegisterFactory(Core, "A", SimpleFactory("A"))
 
-			container.PutFactory(InterfaceInjectedFactory)
+			container.RegisterFactory(Core, "INJECTED", InterfaceInjectedFactory)
 
 			container.CallInjected(func(injected *InterfaceInjected) {
 				Expect(injected).To(Equal(&InterfaceInjected{&Simple{"A"}}))
@@ -137,9 +137,9 @@ var _ = Describe("IOC factory", func() {
 
 		It("should create a component with dependency (init)", func() {
 
-			container.PutFactory(SimpleFactory("A"))
+			container.RegisterFactory(Core, "A", SimpleFactory("A"))
 
-			container.Put(&InterfaceInitialized{})
+			container.RegisterComponent(Core, "INJECTED", &InterfaceInitialized{})
 
 			container.CallInjected(func(injected *InterfaceInitialized) {
 				Expect(injected).To(Equal(&InterfaceInitialized{&Simple{"A"}}))
@@ -149,9 +149,9 @@ var _ = Describe("IOC factory", func() {
 
 		It("should create a component with dependency (postInit)", func() {
 
-			container.PutFactory(SimpleFactory("A"))
+			container.RegisterFactory(Core, "A", SimpleFactory("A"))
 
-			container.Put(&InterfacePostInitialized{})
+			container.RegisterComponent(Core, "INJECTED", &InterfacePostInitialized{})
 
 			container.CallInjected(func(injected *InterfacePostInitialized) {
 				Expect(injected).To(Equal(&InterfacePostInitialized{&Simple{"A"}}))
@@ -165,11 +165,11 @@ var _ = Describe("IOC factory", func() {
 
 		It("should create a component with a slice of dependencies", func() {
 
-			container.PutFactory(SimpleFactory("A1"), func(Doer) {})
-			container.PutFactory(SimpleFactory("A2"), func(Doer) {})
-			container.PutFactory(SimpleFactory("A3"), func(Doer) {})
+			container.RegisterFactory(Core, "A1", SimpleFactory("A1"), func(Doer) {})
+			container.RegisterFactory(Core, "A2", SimpleFactory("A2"), func(Doer) {})
+			container.RegisterFactory(Core, "A3", SimpleFactory("A3"), func(Doer) {})
 
-			container.Put(&SliceInjected{})
+			container.RegisterComponent(Core, "INJECTED", &SliceInjected{})
 
 			container.CallInjected(func(injected *SliceInjected) {
 				Expect(injected.Simple).To(ConsistOf(
@@ -182,11 +182,11 @@ var _ = Describe("IOC factory", func() {
 
 		It("should inject a slice discarding nil components", func() {
 
-			container.PutFactory(SimpleFactory("A1"))
-			container.PutFactory(func() *Simple { return nil })
-			container.PutFactory(SimpleFactory("A3"))
+			container.RegisterFactory(Core, "A1", SimpleFactory("A1"))
+			container.RegisterFactory(Core, "NIL", func() *Simple { return nil })
+			container.RegisterFactory(Core, "A3", SimpleFactory("A3"))
 
-			container.Put(&SliceInjected{})
+			container.RegisterComponent(Core, "INJECTED", &SliceInjected{})
 
 			container.CallInjected(func(injected *SliceInjected) {
 				Expect(injected.Simple).To(ConsistOf(
@@ -198,11 +198,11 @@ var _ = Describe("IOC factory", func() {
 
 		It("should inject a slice of interface", func() {
 
-			container.PutFactory(SimpleFactory("A1"), func(Doer) {})
-			container.PutFactory(SimpleFactory("A2"), func(Doer) {})
-			container.PutFactory(TrivialFactory("T1"), func(Doer) {})
+			container.RegisterFactory(Core, "A1", SimpleFactory("A1"), func(Doer) {})
+			container.RegisterFactory(Core, "A2", SimpleFactory("A2"), func(Doer) {})
+			container.RegisterFactory(Core, "T1", TrivialFactory("T1"), func(Doer) {})
 
-			container.Put(&InterfaceSliceInjected{})
+			container.RegisterComponent(Core, "INJECTED", &InterfaceSliceInjected{})
 
 			container.CallInjected(func(injected *InterfaceSliceInjected) {
 				Expect(injected.Doers).To(ConsistOf(
@@ -215,7 +215,7 @@ var _ = Describe("IOC factory", func() {
 
 		It("should inject an empty slice", func() {
 
-			container.Put(&InterfaceSliceInjected{})
+			container.RegisterComponent(Core, "INJECTED", &InterfaceSliceInjected{})
 
 			container.CallInjected(func(injected *InterfaceSliceInjected) {
 				Expect(injected.Doers).To(BeEmpty())

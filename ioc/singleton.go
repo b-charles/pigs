@@ -1,8 +1,6 @@
 package ioc
 
-import (
-	"sync"
-)
+import "sync"
 
 var (
 	containerInstance *Container
@@ -17,40 +15,85 @@ func ContainerInstance() *Container {
 	return containerInstance
 }
 
-// ErroneousDefaultPutFactory records a default component defined by a factory and
-// optional signatures and returns an error if something wrong happened.
+// ErroneousDefaultPutNamedFactory records a default component defined by its
+// name, its factory and optional signatures and returns an error if something
+// wrong happened.
+func ErroneousDefaultPutNamedFactory(name string, factory any, signFuncs ...any) error {
+	return ContainerInstance().RegisterFactory(Def, name, factory, signFuncs...)
+}
+
+// ErroneousDefaultPutFactory records an anonymous default component defined by
+// its factory and optional signatures and returns an error if something wrong
+// happened.
 func ErroneousDefaultPutFactory(factory any, signFuncs ...any) error {
-	return ContainerInstance().DefaultPutFactory(factory, signFuncs...)
+	return ContainerInstance().RegisterFactory(Def, "", factory, signFuncs...)
 }
 
-// ErroneousDefaultPut records directly a default component with optional signatures
-// and returns an error if something wrong happened.
+// ErroneousDefaultPutNamed records a default component defined by its name,
+// its value and optional signatures and returns an error if something wrong
+// happened.
+func ErroneousDefaultPutNamed(name string, object any, signFuncs ...any) error {
+	return ContainerInstance().RegisterComponent(Def, name, object, signFuncs...)
+}
+
+// ErroneousDefaultPut records an anonymous default component defined by its
+// value and optional signatures and returns an error if something wrong
+// happened.
 func ErroneousDefaultPut(object any, signFuncs ...any) error {
-	return ContainerInstance().DefaultPut(object, signFuncs...)
+	return ContainerInstance().RegisterComponent(Def, "", object, signFuncs...)
 }
 
-// ErroneousPutFactory records a component defined by a factory and optional
-// signatures and returns an error if something wrong happened.
+// ErroneousPutNamedFactory records a core component defined by its name, its
+// factory and optional signatures and returns an error if something wrong
+// happened.
+func ErroneousPutNamedFactory(name string, factory any, signFuncs ...any) error {
+	return ContainerInstance().RegisterFactory(Core, name, factory, signFuncs...)
+}
+
+// ErroneousPutFactory records an anonymous core component defined by its
+// factory and optional signatures and returns an error if something wrong
+// happened.
 func ErroneousPutFactory(factory any, signFuncs ...any) error {
-	return ContainerInstance().PutFactory(factory, signFuncs...)
+	return ContainerInstance().RegisterFactory(Core, "", factory, signFuncs...)
 }
 
-// ErroneousPut records directly a component with optional signatures and
-// returns an error if something wrong happened.
+// ErroneousPutNamed records a core component defined by its name, its value
+// and optional signatures and returns an error if something wrong happened.
+func ErroneousPutNamed(name string, object any, signFuncs ...any) error {
+	return ContainerInstance().RegisterComponent(Core, name, object, signFuncs...)
+}
+
+// ErroneousPut records directly an anonymous core component defined by its
+// value and optional signatures and returns an error if something wrong
+// happened.
 func ErroneousPut(object any, signFuncs ...any) error {
-	return ContainerInstance().Put(object, signFuncs...)
+	return ContainerInstance().RegisterComponent(Core, "", object, signFuncs...)
 }
 
-// ErroneousTestPutFactory records a test component defined by a factory and
-// optional signatures and returns an error if something wrong happened.
+// ErroneousTestPutNamedFactory records a test component defined by its name,
+// its factory and optional signatures and returns an error if something wrong
+// happened.
+func ErroneousTestPutNamedFactory(name string, factory any, signFuncs ...any) error {
+	return ContainerInstance().RegisterFactory(Test, name, factory, signFuncs...)
+}
+
+// ErroneousTestPutFactory records an anonymous test component defined by its
+// factory and optional signatures and returns an error if something wrong
+// happened.
 func ErroneousTestPutFactory(factory any, signFuncs ...any) error {
-	return ContainerInstance().TestPutFactory(factory, signFuncs...)
+	return ContainerInstance().RegisterFactory(Test, "", factory, signFuncs...)
 }
 
-// ErroneousTestPut records directly a test component with optional signatures
-// and returns an error if something wrong happened.
+// ErroneousTestPut records a test component defined by its name, its value and
+// optional signatures and returns an error if something wrong happened.
+func ErroneousTestPutNamed(name string, object any, signFuncs ...any) error {
+	return ContainerInstance().RegisterComponent(Test, name, object, signFuncs...)
+}
+
+// ErroneousTestPut records an anonymous test component defined by its value
+// and optional signatures and returns an error if something wrong happened.
 func ErroneousTestPut(object any, signFuncs ...any) error {
-	return ContainerInstance().TestPut(object, signFuncs...)
+	return ContainerInstance().RegisterComponent(Test, "", object, signFuncs...)
 }
 
 // ErroneousCallInjected call the given method, injecting its arguments and
@@ -59,56 +102,98 @@ func ErroneousCallInjected(method any) error {
 	return ContainerInstance().CallInjected(method)
 }
 
-// DefaultPutFactory records a default component defined by a factory and optional
-// signatures. Panics if something wrong happened.
+// DefaultPutNamedFactory records a default component defined by its name, its
+// factory and optional signatures. Panics if something wrong happened.
+func DefaultPutNamedFactory(name string, factory any, signFuncs ...any) {
+	if err := ErroneousDefaultPutNamedFactory(name, factory, signFuncs...); err != nil {
+		panic(err)
+	}
+}
+
+// DefaultPutFactory records an anonymous default component defined by its
+// factory and optional signatures. Panics if something wrong happened.
 func DefaultPutFactory(factory any, signFuncs ...any) {
-	err := ErroneousDefaultPutFactory(factory, signFuncs...)
-	if err != nil {
+	if err := ErroneousDefaultPutFactory(factory, signFuncs...); err != nil {
 		panic(err)
 	}
 }
 
-// DefaultPut records directly a default component with optional signatures. Panics
-// if something wrong happened.
+// DefaultPutNamed records a default component defined by its name, its value
+// and optional signatures. Panics if something wrong happened.
+func DefaultPutNamed(name string, object any, signFuncs ...any) {
+	if err := ErroneousDefaultPutNamed(name, object, signFuncs...); err != nil {
+		panic(err)
+	}
+}
+
+// DefaultPut records an anonymous default component defined by its value and
+// optional signatures. Panics if something wrong happened.
 func DefaultPut(object any, signFuncs ...any) {
-	err := ErroneousDefaultPut(object, signFuncs...)
-	if err != nil {
+	if err := ErroneousDefaultPut(object, signFuncs...); err != nil {
 		panic(err)
 	}
 }
 
-// PutFactory records a component defined by a factory and optional
-// signatures. Panics if something wrong happened.
+// PutNamedFactory records a core component defined by its name, its factory
+// and optional signatures. Panics if something wrong happened.
+func PutNamedFactory(name string, factory any, signFuncs ...any) {
+	if err := ErroneousPutNamedFactory(name, factory, signFuncs...); err != nil {
+		panic(err)
+	}
+}
+
+// PutFactory records an anonymous core component defined by its factory and
+// optional signatures. Panics if something wrong happened.
 func PutFactory(factory any, signFuncs ...any) {
-	err := ErroneousPutFactory(factory, signFuncs...)
-	if err != nil {
+	if err := ErroneousPutFactory(factory, signFuncs...); err != nil {
 		panic(err)
 	}
 }
 
-// Put records directly a component with optional signatures. Panics if
-// something wrong happened.
+// PutNamed records a core component defined by its name, its value and
+// optional signatures. Panics if something wrong happened.
+func PutNamed(name string, object any, signFuncs ...any) {
+	if err := ErroneousPutNamed(name, object, signFuncs...); err != nil {
+		panic(err)
+	}
+}
+
+// Put records a core component defined by its value and optional signatures.
+// Panics if something wrong happened.
 func Put(object any, signFuncs ...any) {
-	err := ErroneousPut(object, signFuncs...)
-	if err != nil {
+	if err := ErroneousPut(object, signFuncs...); err != nil {
 		panic(err)
 	}
 }
 
-// TestPutFactory records a test component defined by a factory and optional
-// signatures. Panics if something wrong happened.
+// TestPutNamedFactory records a test component defined by its name, its
+// factory and optional signatures. Panics if something wrong happened.
+func TestPutNamedFactory(name string, factory any, signFuncs ...any) {
+	if err := ErroneousTestPutNamedFactory(name, factory, signFuncs...); err != nil {
+		panic(err)
+	}
+}
+
+// TestPutFactory records an anonymous test component defined by its factory
+// and optional signatures. Panics if something wrong happened.
 func TestPutFactory(factory any, signFuncs ...any) {
-	err := ErroneousTestPutFactory(factory, signFuncs...)
-	if err != nil {
+	if err := ErroneousTestPutFactory(factory, signFuncs...); err != nil {
 		panic(err)
 	}
 }
 
-// TestPut records directly a test component with optional signatures. Panics
-// if something wrong happened.
+// TestPutNamed records a test component defined by its name, its value and
+// optional signatures. Panics if something wrong happened.
+func TestPutNamed(name string, object any, signFuncs ...any) {
+	if err := ErroneousTestPutNamed(name, object, signFuncs...); err != nil {
+		panic(err)
+	}
+}
+
+// TestPut records an anonymous test component defined by its value and
+// optional signatures. Panics if something wrong happened.
 func TestPut(object any, signFuncs ...any) {
-	err := ErroneousTestPut(object, signFuncs...)
-	if err != nil {
+	if err := ErroneousTestPut(object, signFuncs...); err != nil {
 		panic(err)
 	}
 }
@@ -116,8 +201,7 @@ func TestPut(object any, signFuncs ...any) {
 // CallInjected call the given method, injecting its arguments. Panics if
 // something wrong happened.
 func CallInjected(method any) {
-	err := ErroneousCallInjected(method)
-	if err != nil {
+	if err := ErroneousCallInjected(method); err != nil {
 		panic(err)
 	}
 }

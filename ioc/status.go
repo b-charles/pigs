@@ -89,33 +89,12 @@ func sortComponentsRecords(slice []ComponentRecords) {
 // Instance wrapper
 
 type InstanceRecords struct {
-	Scope    scope
 	Type     reflect.Type
 	Instance any
 	Closable bool
 }
 
 func (self InstanceRecords) write(builder *strings.Builder) {
-
-	if self.Scope == core {
-		builder.WriteString("[")
-		builder.WriteString(colorCyan)
-		builder.WriteString("Core")
-		builder.WriteString(colorReset)
-		builder.WriteString("] ")
-	} else if self.Scope == def {
-		builder.WriteString("[")
-		builder.WriteString(colorYellow)
-		builder.WriteString("Def")
-		builder.WriteString(colorReset)
-		builder.WriteString("]  ")
-	} else { // scope == test
-		builder.WriteString("[")
-		builder.WriteString(colorPurple)
-		builder.WriteString("Test")
-		builder.WriteString(colorReset)
-		builder.WriteString("] ")
-	}
 
 	builder.WriteString(typeAlignString(self.Type))
 	if self.Closable {
@@ -235,7 +214,6 @@ func (self *ContainerStatus) update() {
 		}
 
 		self.Instances = append(self.Instances, InstanceRecords{
-			Scope:    comp.scope,
 			Type:     comp.main,
 			Instance: value,
 			Closable: inst.isClosable(),

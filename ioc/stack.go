@@ -13,8 +13,8 @@ type componentStack struct {
 
 func newComponentStack() *componentStack {
 	return &componentStack{
-		[]*component{},
-		map[*component]bool{},
+		make([]*component, 0, 20),
+		make(map[*component]bool, 20),
 	}
 }
 

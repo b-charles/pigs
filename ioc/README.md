@@ -26,9 +26,14 @@ And some goals are deliberated ignored:
 
 ### Container and components
 
-A component is something: a struct, a pointer, a map, a chan, an integer... It's a variable that should be unique (singleton) and which will be injected in all other components that need it. Each component is defined by its type and optionally some _signatures_: some additional interfaces which are implemented by the component and declared when registering the component[^duck]. Multiple components can share the same type and signatures to enable auto-discovery, but that concept can be confusing and error-prone: it can be considered good practice to register each component with a specific and unique type, and using signatures only when auto-discovery is needed. Any component with a value `nil` will be silently discarded and never be injected in another comonent. This behaviour, together with auto-discovery and scopes features, helps implement conditional component creation.
+A component is something: a struct, a pointer, a map, a chan, an integer... It's a variable that should be unique (singleton) and which will be injected in all other components that need it. Each component is defined by:
+ * an optional name: the name doesn't play any role in the injection process but can be defined for debugging purposes.
+ * its value or its factory: you can directly define the component value or produce a function which will create the component value. That kind of function is called a factory.
+ * its main type, computed by reflection on the given value or the factory.
+ * and optionally some _signature_ interfaces which are some additional interfaces implemented by the component[^duck]. Multiple components can share the same main type and signatures to enable auto-discovery, but that concept can be confusing and error-prone: it can be considered good practice to register each component with a specific and unique main type, and using signatures only when auto-discovery is needed.
+Any component with a value `nil` will be silently discarded and never be injected in another component. This behaviour, together with auto-discovery and scopes features, helps implement conditional component creation.
 
-A container is a set of components: it manages the lifecycle of each component and take in charge the injection process. The container is a managed component itself and can be injected in any component.
+A container is a set of components: it manages the lifecycle of each component and take in charge the injection process. The framework defines one instance of this container and redirect all API calls to that container.
 
 [^duck]: The concept of signature is not very in line with the spirit of the duck typing of Go, but it's a need for performance (what should be injected, without checking each component) and flexibility (what should *not* be injected, even if the interface matches the implementation).
 
@@ -50,7 +55,7 @@ type MyInjectedStruct struct {
 
 var injected *MyInjectedStruct = &MyInjectedStruct{}
 ```
-the first field `NotInjected` is not injected. The second and third fields `FirstInject` and `SecondInject` are injected with components with a type or a signature respectively `*Something` and `SomeInterface`. Please note that each injected field should be settable (so exported, with a name beginning with an upper case).
+the first field `NotInjected` is not injected. The second field `FirstInject` is injected with a component defined with a main type at `*Something` and the third field `SecondInject` is injected with a component with a main type or a signature `SomeInterface`. Please note that each injected field should be settable (so exported, with a name beginning with an upper case).
 
 #### Injection of functions
 
@@ -58,7 +63,7 @@ At other points of the framework, the container use some user-defined functions,
 ```go
 func InjectedFunc(first mypkg.SomeInterface, second *anotherlib.RandomComponent) { ... }
 ```
-If the container calls the function, the first argument will be injected with a component with a type or signature `mypkg.SomeInterface` and the second argument with a component with a type or signature `*anotherlib.RandomComponent`.
+If the container calls the function, the first argument will be injected with a component with a main type or signature `mypkg.SomeInterface` and the second argument with a component with a main type `*anotherlib.RandomComponent`.
 
 Injected functions can take any number of input arguments, none included.
 
@@ -72,7 +77,7 @@ type MyInjectedStruct struct {
 
 var injected *MyInjectedStruct = &MyInjectedStruct{}
 ```
-Here, if `injected` is injected by the container, the field `AllComponents` will contains every components defined with the type or signature `SomeInterface`. The injected slice will never contain a `nil` value: `nil` components are discarded. If no component is found, the injected slice is empty. This feature can useful to implement an optional injection.
+Here, if `injected` is injected by the container, the field `AllComponents` will contains every components defined with the type or signature `SomeInterface`. The injected slice will never contain a `nil` value: `nil` components are discarded. If no component is found, the injected slice is empty. This feature can be useful to implement an optional injection.
 
 #### Scopes: Default, Core and Testing
 
@@ -82,7 +87,7 @@ The API is defined to record a component in the default set, the core set or in 
  * write some libraries with default fonctionnalities which can be overloaded by the main application,
  * define clean unit test that mock some components and limit each test to a part of the application (not the entire application, but not only one component neither).
 
-Last little trick: you can promote a component to a "superior" scope (a default component to a core or a test component, or a core component as a test component). If during the instanciation of a test component by a factory (a function which returns the component), a component of the same type produced by the factory is required, the container doesn't throw a cyclic dependency error (as it should) but search if a core or a default component can be used. In the same way, if a core component factory requires a component of the same type, the container search if a default component can be used. This mechanism can be usefull to define quickly one composant which will be injected in a slice by auto-discovery, or to configure a component for a test environment.
+Last little trick: you can promote a component to a "superior" scope (a default component to a core or a test component, or a core component as a test component). If during the instanciation of a test component by a factory (a function which returns the component value), a component of the same type produced by the factory is required, the container doesn't throw a cyclic dependency error (as it should) but search if a core or a default component can be used. In the same way, if a core component factory requires a component of the same type, the container search if a default component can be used. This mechanism can be usefull to define quickly one composant which will be injected in a slice by auto-discovery, or to configure a component for a test environment.
 
 ### Container and components lifecycles
 
@@ -105,7 +110,7 @@ Let's see each steps in details.
 
 To be able to use a component, you should start by recording it, or by defining how it will be created. That's the definition step.
 
-You can call the functions `ioc.Put` to record directly the component:
+You can call the function `ioc.Put` to record directly the component:
 ```go
 type DemoComponent struct { ... }
 
@@ -113,7 +118,7 @@ func init() {
     ioc.Put(&DemoComponent{})
 }
 ```
-Calling the function with `nil` as input will do nothing. Recording a component doesn't inject it (not yet). It is only recorded as a not yet initialized component. Signatures can be defined with one or several little weird functions. For example, `func(FirstInterface, SecondInterface) {}` defines two signatures `FirstInterface` and  `SecondInterface`. Signatures can be defined in the `ioc.Put` function:
+Calling the function with `nil` as input will do nothing. Recording a component doesn't inject it (not yet). It is only recorded as a not yet initialized component. Signature interfaces can be defined as input argument types of one or several empty functions. For example, `func(FirstInterface, SecondInterface) {}` defines two signatures `FirstInterface` and  `SecondInterface`. Signatures can be provided in the `ioc.Put` function:
 ```go
 type DemoComponent struct { ... }
 
@@ -123,7 +128,17 @@ func init() {
 ```
 When a component is registered with signatures, the framework checks that the component can be casted to each signature type and panics if this is not the case.
 
-Instead of `ioc.Put`, you can also use `ioc.PutFactory` to define a factory, a function which will create the component:
+Use can also give a name or a label to the component, using the function `ioc.PutNamed`:
+```go
+type DemoComponent struct { ... }
+
+func init() {
+    ioc.PutNamed("My demo component", &DemoComponent{})
+}
+```
+The name is only for debugging, can be any string, and doesn't modify the behaviour of the container regarding the component.
+
+Instead of `ioc.Put` and `ioc.PutNamed`, you can also use `ioc.PutFactory` and `ioc.PutNamedFactory` to define a factory, a function which will create the component:
 ```go
 package mypkg
 
@@ -134,10 +149,10 @@ func ComponentFactory() *DemoComponent {
 }
 
 func init() {
-    ioc.PutFactory(ComponentFactory, func(FirstInterface, SecondInterface) {});
+    ioc.PutNamedFactory("My demo component", ComponentFactory, func(FirstInterface, SecondInterface) {});
 }
 ```
-The function `PutFactory` use the type of the first output to get the type of the component. Like `ioc.Put`, registering a `nil` value will do nothing, and if signatures are defined, `ioc.PutFactory` will check that each signature is implemented by the returned type of the factory. Recording a factory doesn't call it, but it will be used to instantiate the component in a next step. At that time, the arguments of the factory will be injected like it is described in the section [Injection of functions](#injection-of-functions). The factory should at least return the created component or `nil`: in that case, the component will be discarded and not used in the future injections. The factory can also return an error:
+The functions `ioc.PutFactory` and `ioc.PutNamedFactory` use the type of the first output to get the type of the component. Like `ioc.Put`, registering a `nil` value will do nothing, and if signatures are defined, `ioc.PutFactory` `ioc.PutNamedFactory` will check that each signature is implemented by the returned type of the factory. Recording a factory doesn't call it, but it will be used to instantiate the component in a next step. At that time, the arguments of the factory will be injected like it is described in the section [Injection of functions](#injection-of-functions). The factory should at least return the created component or `nil`: in that case, the component will be discarded and not used in the future injections. The factory can also return an error:
 ```go
 type DemoComponent struct {}
 
@@ -151,15 +166,15 @@ func ComponentFactory() (*DemoComponent, error) {
 }
 
 func init() {
-    ioc.PutFactory(ComponentFactory)
+    ioc.PutNamedFactory("My demo component", ComponentFactory)
 }
 ```
 
 Factories can not define cyclic dependencies (i.e. a factory produces a component `A` which is needed to another factory to create a component `B` which should be injected in the factory of `A`). To resolve the problem, you have to break the cycle, or wait another step in the component's lifecycle (like [Injection](#injection) or [Post-Initialization](#post-initialization)) to inject the required component.
 
-Like explain in the section [Scopes: Default, Core and Testing](#scopes-default-core-and-testing), the functions `Put` and `PutFactory` define the component in the core set. The functions `DefaultPut` and `DefaultPutFactory` can be used in the same way to define a component in the default set, and the functions `TestPut` and `TestPutFactory` for the test set.
+Like explain in the section [Scopes: Default, Core and Testing](#scopes-default-core-and-testing), the functions `Put`, `PutNamed`, `PutFactory` and `PutNamedFactory` define the component in the core set. The functions `DefaultPut`, `DefaultPutNamed`, `DefaultPutFactory` and `DefaultPutNamedFactory` can be used in the same way to define a component in the default set, and the functions `TestPut`, `TestPutNamed`, `TestPutFactory` and `TestPutNamedFactory` for the test set.
 
-Finaly, all this methods have their `Erroneous*` prefixed version (e.g. `ErroneousTestPut`) which doesn't panic but returns an error if something wrong happened.
+Finaly, all this methods have their `Erroneous*` prefixed version (e.g. `ErroneousTestPutNamed`) which doesn't panic but returns an error if something wrong happened.
 
 ### Exploitation
 
@@ -191,13 +206,11 @@ During the call of `CallInjected`, the instance of some components will be requi
 
 ##### Instantiation
 
-Of course, the first step is to create an instance. If the component has been defined with the functions `DefaultPut`, `Put` or `TestPut`, the instance is directly used. If the component has been defined with a factory, with the function `DefaultPutFactory`, `PutFactory` or `TestPutFactory`, the factory is called with its argument injected. See [the scope section](#scopes-default-core-and-testing) to know how the scope is choosed.
-
-If a factory return a not-null error, the container stops all the process as soon as possible and return the error wrapped in some context message.
+Of course, the first step is to create an instance. If the component has been directly defined by its value, the instance is used. If the component has been defined with a factory, the factory is called with its argument injected. If the factory returns a not-null error, the container stops all the process as soon as possible and returns the error wrapped in some context message.
 
 ##### Injection
 
-Regardless of the registration mode (instance or factory), if the component is a pointer to a structure, it is injected. The process is defined in the section [Injection of structures](#injection-of-structures).
+Regardless of the registration mode (value or factory), if the component is a pointer to a structure, it is injected. The process is defined in the section [Injection of structures](#injection-of-structures).
 
 At this point, cyclic dependencies are not an issue anymore.
 
@@ -207,7 +220,7 @@ If the component have a method `PostInit`, the container calls it. The method is
 
 #### Run main function
 
-When each necessary components are fully initialized, the framework call the given function of `CallInjected`. That's what we wanted from the start and where your business begins. Be carefully if you are working with multi-threads: the end of this function will trigger the next phase of the container and so the closing of components.
+When each necessary components are fully initialized, the framework call the given function of `CallInjected`. That's what we wanted from the start and where your business begins. Be careful if you are working with multi-threads: the end of this function will trigger the next phase of the container and so the closing of components.
 
 #### Close
 

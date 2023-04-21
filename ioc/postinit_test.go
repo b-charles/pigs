@@ -16,10 +16,10 @@ var _ = Describe("IOC post-init and close", func() {
 
 	It("should call PostInit in the correct order", func() {
 
-		container.PutFactory(NewOrderRegister)
-		container.Put(&First{})
-		container.Put(&Second{})
-		container.Put(&Third{})
+		container.RegisterFactory(Core, "REGISTER", NewOrderRegister)
+		container.RegisterComponent(Core, "1", &First{})
+		container.RegisterComponent(Core, "2", &Second{})
+		container.RegisterComponent(Core, "3", &Third{})
 
 		var third *Third
 		Expect(container.CallInjected(func(injected *Third) {
@@ -32,10 +32,10 @@ var _ = Describe("IOC post-init and close", func() {
 
 	It("should call Close in the correct order", func() {
 
-		container.PutFactory(NewOrderRegister)
-		container.Put(&First{})
-		container.Put(&Second{})
-		container.Put(&Third{})
+		container.RegisterFactory(Core, "REGISTER", NewOrderRegister)
+		container.RegisterComponent(Core, "1", &First{})
+		container.RegisterComponent(Core, "2", &Second{})
+		container.RegisterComponent(Core, "3", &Third{})
 
 		var third *Third
 		Expect(container.CallInjected(func(injected *Third) {

@@ -8,9 +8,9 @@ import (
 func init() {
 
 	// File system
-	DefaultPutFactory(afero.NewOsFs, func(afero.Fs) {})
+	DefaultPutNamedFactory("Native file system", afero.NewOsFs, func(afero.Fs) {})
 
 	// Clock
-	DefaultPutFactory(clock.New, func(clock.Clock) {})
+	DefaultPutNamedFactory("Native clock", clock.New, func(clock.Clock) {})
 
 }
