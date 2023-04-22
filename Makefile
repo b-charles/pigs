@@ -5,7 +5,7 @@ test:
 	ginkgo -r
 
 watch:
-	ginkgo watch -r -p
+	ginkgo watch -r -depth 25
 
 tidy:
 	go mod tidy
