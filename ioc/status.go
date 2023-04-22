@@ -10,6 +10,8 @@ import (
 
 var (
 	colorReset  = "\033[0m"
+	colorFaint  = "\033[2m"
+	colorStrike = "\033[9m"
 	colorRed    = "\033[31m"
 	colorGreen  = "\033[32m"
 	colorYellow = "\033[33m"
@@ -28,14 +30,6 @@ func typeElem(typ reflect.Type) (reflect.Type, bool) {
 	}
 }
 
-func typeAlignString(typ reflect.Type) string {
-	if t, p := typeElem(typ); p {
-		return typ.String()
-	} else {
-		return fmt.Sprintf(" %s", t.String())
-	}
-}
-
 func typeLess(a, b reflect.Type) bool {
 	ae, _ := typeElem(a)
 	be, _ := typeElem(b)
@@ -44,35 +38,135 @@ func typeLess(a, b reflect.Type) bool {
 
 // Component wrapper
 
-type ComponentRecords struct {
-	Type       reflect.Type
-	From       []reflect.Type
-	Overloaded bool
+type ComponentRecord interface {
+	Name() string
+	Type() reflect.Type
+	Instanciated() bool
 }
 
-func (self ComponentRecords) write(builder *strings.Builder) {
+type componentRecordImpl struct {
+	name         string
+	typ          reflect.Type
+	instanciated bool
+}
 
-	builder.WriteString(typeAlignString(self.Type))
+func (self *componentRecordImpl) Name() string {
+	return self.name
+}
 
-	if self.Overloaded {
-		builder.WriteString(" (")
-		builder.WriteString(colorPurple)
-		builder.WriteString("Overloaded")
-		builder.WriteString(colorReset)
-		builder.WriteString(")")
-	}
+func (self *componentRecordImpl) Type() reflect.Type {
+	return self.typ
+}
 
-	if len(self.From) == 1 && self.Type == self.From[0] {
+func (self *componentRecordImpl) Instanciated() bool {
+	return self.instanciated
+}
+
+type ComponentType interface {
+	Type() reflect.Type
+	NumComponents() int
+	GetComponent(int) ComponentRecord
+	Overloaded() bool
+}
+
+type componentTypeImpl struct {
+	typ        reflect.Type
+	components []*componentRecordImpl
+	overloaded bool
+}
+
+func (self *componentTypeImpl) Type() reflect.Type {
+	return self.typ
+}
+
+func (self *componentTypeImpl) NumComponents() int {
+	return len(self.components)
+}
+
+func (self *componentTypeImpl) GetComponent(i int) ComponentRecord {
+	return self.components[i]
+}
+
+func (self *componentTypeImpl) Overloaded() bool {
+	return self.overloaded
+}
+
+func (self *componentTypeImpl) write(builder *strings.Builder) {
+
+	if len(self.components) == 1 && self.typ == self.components[0].typ {
+
+		name := self.components[0].name
+		instanciated := self.components[0].instanciated
+
+		if _, p := typeElem(self.typ); !p {
+			builder.WriteString(" ")
+		}
+
+		if self.overloaded {
+			builder.WriteString(colorStrike)
+		} else if !instanciated {
+			builder.WriteString(colorFaint)
+		}
+
+		builder.WriteString(self.typ.String())
+
+		if name != "" {
+			builder.WriteString(" - ")
+			builder.WriteString(name)
+		}
+
+		if self.overloaded {
+			builder.WriteString(colorReset)
+			builder.WriteString(" ")
+			builder.WriteString(colorFaint)
+			builder.WriteString("Overloaded")
+			builder.WriteString(colorReset)
+		} else if !instanciated {
+			builder.WriteString(colorReset)
+		}
+
 		builder.WriteString("\n")
+
 	} else {
 
+		if _, p := typeElem(self.typ); !p {
+			builder.WriteString(" ")
+		}
+
+		if self.overloaded {
+			builder.WriteString(colorStrike)
+		}
+
+		builder.WriteString(self.typ.String())
+
+		if self.overloaded {
+			builder.WriteString(colorReset)
+			builder.WriteString(" ")
+			builder.WriteString(colorFaint)
+			builder.WriteString("Overloaded")
+			builder.WriteString(colorReset)
+		}
+
 		builder.WriteString(" (")
-		builder.WriteString(strconv.Itoa(len(self.From)))
+		builder.WriteString(strconv.Itoa(len(self.components)))
 		builder.WriteString(")\n")
 
-		for _, t := range self.From {
+		for _, t := range self.components {
 			builder.WriteString("   |-> ")
-			builder.WriteString(typeAlignString(t))
+			if _, p := typeElem(t.typ); !p {
+				builder.WriteString(" ")
+			}
+			if !t.instanciated {
+				builder.WriteString(colorFaint)
+			}
+			builder.WriteString(t.typ.String())
+			if name := t.name; name != "" {
+				builder.WriteString(" - ")
+				builder.WriteString(name)
+			}
+			if !t.instanciated {
+				builder.WriteString(colorReset)
+			}
 			builder.WriteString("\n")
 		}
 
@@ -80,158 +174,283 @@ func (self ComponentRecords) write(builder *strings.Builder) {
 
 }
 
-func sortComponentsRecords(slice []ComponentRecords) {
-	sort.Slice(slice, func(i, j int) bool {
-		return typeLess(slice[i].Type, slice[j].Type)
-	})
-}
-
 // Instance wrapper
 
-type InstanceRecords struct {
-	Type     reflect.Type
-	Instance any
-	Closable bool
+type ComponentInstance interface {
+	Scope() Scope
+	Name() string
+	Type() reflect.Type
+	Value() any
+	Closable() bool
 }
 
-func (self InstanceRecords) write(builder *strings.Builder) {
+type componentInstanceImpl struct {
+	scope    Scope
+	name     string
+	typ      reflect.Type
+	value    any
+	closable bool
+}
 
-	builder.WriteString(typeAlignString(self.Type))
-	if self.Closable {
+func (self *componentInstanceImpl) Scope() Scope {
+	return self.scope
+}
+
+func (self *componentInstanceImpl) Name() string {
+	return self.name
+}
+
+func (self *componentInstanceImpl) Type() reflect.Type {
+	return self.typ
+}
+
+func (self *componentInstanceImpl) Value() any {
+	return self.value
+}
+
+func (self *componentInstanceImpl) Closable() bool {
+	return self.closable
+}
+
+func (self *componentInstanceImpl) write(builder *strings.Builder) {
+
+	if self.scope == Core {
+		builder.WriteString("[")
+		builder.WriteString(colorCyan)
+		builder.WriteString("Core")
+		builder.WriteString(colorReset)
+		builder.WriteString("] ")
+	} else if self.scope == Def {
+		builder.WriteString("[")
+		builder.WriteString(colorYellow)
+		builder.WriteString("Def")
+		builder.WriteString(colorReset)
+		builder.WriteString("]  ")
+	} else { // scope == test
+		builder.WriteString("[")
+		builder.WriteString(colorPurple)
+		builder.WriteString("Test")
+		builder.WriteString(colorReset)
+		builder.WriteString("] ")
+	}
+
+	if _, p := typeElem(self.typ); !p {
+		builder.WriteString(" ")
+	}
+	builder.WriteString(self.typ.String())
+	if name := self.name; name != "" {
+		builder.WriteString(" - ")
+		builder.WriteString(name)
+	}
+
+	if self.closable {
 		builder.WriteString(" (")
 		builder.WriteString(colorYellow)
 		builder.WriteString("Closable")
 		builder.WriteString(colorReset)
 		builder.WriteString(")")
 	}
-	builder.WriteString(": ")
-	builder.WriteString(fmt.Sprintf("%v", self.Instance))
+
+	if stringer, ok := self.value.(fmt.Stringer); ok {
+		builder.WriteString(":\n    ")
+		if str := stringer.String(); str != "" {
+			builder.WriteString(strings.ReplaceAll(str, "\n", "\n    "))
+		}
+	}
 	builder.WriteString("\n")
 
 }
 
 // Container status
 
-type ContainerStatus struct {
-	container *Container
-	Default   []ComponentRecords
-	Core      []ComponentRecords
-	Test      []ComponentRecords
-	Instances []InstanceRecords
+type ContainerStatus interface {
+	NumDefaultTypes() int
+	DefaultType(int) ComponentType
+	NumCoreTypes() int
+	CoreType(int) ComponentType
+	NumTestTypes() int
+	TestType(int) ComponentType
+	NumInstances() int
+	Instance(int) ComponentInstance
+	String() string
+	Print()
 }
 
-var containerStatus_type reflect.Type = reflect.TypeOf(&ContainerStatus{})
+type containerStatusImpl struct {
+	def       []*componentTypeImpl
+	core      []*componentTypeImpl
+	test      []*componentTypeImpl
+	instances []*componentInstanceImpl
+}
 
-func (self *ContainerStatus) update() {
+func (self *containerStatusImpl) NumDefaultTypes() int {
+	return len(self.def)
+}
+
+func (self *containerStatusImpl) DefaultType(i int) ComponentType {
+	return self.def[i]
+}
+
+func (self *containerStatusImpl) NumCoreTypes() int {
+	return len(self.core)
+}
+
+func (self *containerStatusImpl) CoreType(i int) ComponentType {
+	return self.core[i]
+}
+
+func (self *containerStatusImpl) NumTestTypes() int {
+	return len(self.test)
+}
+
+func (self *containerStatusImpl) TestType(i int) ComponentType {
+	return self.test[i]
+}
+
+func (self *containerStatusImpl) NumInstances() int {
+	return len(self.instances)
+}
+
+func (self *containerStatusImpl) Instance(i int) ComponentInstance {
+	return self.instances[i]
+}
+
+func (self *containerStatusImpl) update(container *Container) {
 
 	// Default
 
-	self.Default = make([]ComponentRecords, 0, len(self.container.defaultComponents))
-	for typ, comps := range self.container.defaultComponents {
+	self.def = make([]*componentTypeImpl, 0, len(container.defaultComponents))
+	for typ, comps := range container.defaultComponents {
 
-		from := make([]reflect.Type, 0, len(comps))
+		components := make([]*componentRecordImpl, 0, len(comps))
 		for _, comp := range comps {
-			from = append(from, comp.main)
+			_, instanciated := container.instances[comp]
+			components = append(components, &componentRecordImpl{
+				name:         comp.name,
+				typ:          comp.main,
+				instanciated: instanciated,
+			})
 		}
-		sort.Slice(from, func(i, j int) bool {
-			return typeLess(from[i], from[j])
+		sort.Slice(components, func(i, j int) bool {
+			return typeLess(components[i].typ, components[j].typ)
 		})
 
-		_, over := self.container.coreComponents[typ]
-		if !over {
-			_, over = self.container.testComponents[typ]
+		_, overloaded := container.coreComponents[typ]
+		if !overloaded {
+			_, overloaded = container.testComponents[typ]
 		}
 
-		self.Default = append(self.Default, ComponentRecords{
-			Type:       typ,
-			From:       from,
-			Overloaded: over,
+		self.def = append(self.def, &componentTypeImpl{
+			typ:        typ,
+			components: components,
+			overloaded: overloaded,
 		})
 
 	}
-	sort.Slice(self.Default, func(i, j int) bool {
-		return typeLess(self.Default[i].Type, self.Default[j].Type)
+	sort.Slice(self.def, func(i, j int) bool {
+		return typeLess(self.def[i].typ, self.def[j].typ)
 	})
 
 	// Core
 
-	self.Core = make([]ComponentRecords, 0, len(self.container.coreComponents))
-	for typ, comps := range self.container.coreComponents {
+	self.core = make([]*componentTypeImpl, 0, len(container.coreComponents))
+	for typ, comps := range container.coreComponents {
 
-		from := make([]reflect.Type, 0, len(comps))
+		components := make([]*componentRecordImpl, 0, len(comps))
 		for _, comp := range comps {
-			from = append(from, comp.main)
+			_, instanciated := container.instances[comp]
+			components = append(components, &componentRecordImpl{
+				name:         comp.name,
+				typ:          comp.main,
+				instanciated: instanciated,
+			})
 		}
-		sort.Slice(from, func(i, j int) bool {
-			return typeLess(from[i], from[j])
+		sort.Slice(components, func(i, j int) bool {
+			return typeLess(components[i].typ, components[j].typ)
 		})
 
-		_, over := self.container.testComponents[typ]
+		_, overloaded := container.testComponents[typ]
 
-		self.Core = append(self.Core, ComponentRecords{
-			Type:       typ,
-			From:       from,
-			Overloaded: over,
+		self.core = append(self.core, &componentTypeImpl{
+			typ:        typ,
+			components: components,
+			overloaded: overloaded,
 		})
 
 	}
-	sort.Slice(self.Core, func(i, j int) bool {
-		return typeLess(self.Core[i].Type, self.Core[j].Type)
+	sort.Slice(self.core, func(i, j int) bool {
+		return typeLess(self.core[i].typ, self.core[j].typ)
 	})
 
 	// Test
 
-	self.Test = make([]ComponentRecords, 0, len(self.container.testComponents))
-	for typ, comps := range self.container.testComponents {
+	self.test = make([]*componentTypeImpl, 0, len(container.testComponents))
+	for typ, comps := range container.testComponents {
 
-		from := make([]reflect.Type, 0, len(comps))
+		components := make([]*componentRecordImpl, 0, len(comps))
 		for _, comp := range comps {
-			from = append(from, comp.main)
+			_, instanciated := container.instances[comp]
+			components = append(components, &componentRecordImpl{
+				name:         comp.name,
+				typ:          comp.main,
+				instanciated: instanciated,
+			})
 		}
-		sort.Slice(from, func(i, j int) bool {
-			return typeLess(from[i], from[j])
+		sort.Slice(components, func(i, j int) bool {
+			return typeLess(components[i].typ, components[j].typ)
 		})
 
-		self.Test = append(self.Test, ComponentRecords{
-			Type:       typ,
-			From:       from,
-			Overloaded: false,
+		self.test = append(self.test, &componentTypeImpl{
+			typ:        typ,
+			components: components,
+			overloaded: false,
 		})
 
 	}
-	sort.Slice(self.Test, func(i, j int) bool {
-		return typeLess(self.Test[i].Type, self.Test[j].Type)
+	sort.Slice(self.test, func(i, j int) bool {
+		return typeLess(self.test[i].typ, self.test[j].typ)
 	})
 
 	// Instances
 
-	self.Instances = make([]InstanceRecords, 0, len(self.container.instances))
-	for comp, inst := range self.container.instances {
+	self.instances = make([]*componentInstanceImpl, 0, len(container.instances))
+	for comp, inst := range container.instances {
 
 		value := inst.value.Interface()
 		if value == self {
-			value = "<Container status>"
+			value = ""
 		}
 
-		self.Instances = append(self.Instances, InstanceRecords{
-			Type:     comp.main,
-			Instance: value,
-			Closable: inst.isClosable(),
+		var scope Scope
+		if _, p := container.testComponents[comp.main]; p {
+			scope = Test
+		} else if _, p := container.coreComponents[comp.main]; p {
+			scope = Core
+		} else {
+			scope = Def
+		}
+
+		self.instances = append(self.instances, &componentInstanceImpl{
+			scope:    scope,
+			name:     comp.name,
+			typ:      comp.main,
+			value:    value,
+			closable: inst.isClosable(),
 		})
 
 	}
-	sort.Slice(self.Instances, func(i, j int) bool {
-		return typeLess(self.Instances[i].Type, self.Instances[j].Type)
+	sort.Slice(self.instances, func(i, j int) bool {
+		return typeLess(self.instances[i].typ, self.instances[j].typ)
 	})
 
 }
 
-func (self *ContainerStatus) String() string {
+func (self *containerStatusImpl) String() string {
 
 	var builder strings.Builder
 
 	builder.WriteString(colorReset)
-	builder.WriteString("\n Container status \n")
+	builder.WriteString("\n\n Container status \n")
 	builder.WriteString(colorRed)
 	builder.WriteString("------------------\n")
 	builder.WriteString(colorReset)
@@ -241,9 +460,9 @@ func (self *ContainerStatus) String() string {
 	builder.WriteString("###")
 	builder.WriteString(colorReset)
 	builder.WriteString(" Default components (")
-	builder.WriteString(fmt.Sprintf("%d", len(self.Default)))
-	builder.WriteString(")\n")
-	for _, def := range self.Default {
+	builder.WriteString(fmt.Sprintf("%d", len(self.def)))
+	builder.WriteString(")\n\n")
+	for _, def := range self.def {
 		def.write(&builder)
 	}
 
@@ -252,9 +471,9 @@ func (self *ContainerStatus) String() string {
 	builder.WriteString("###")
 	builder.WriteString(colorReset)
 	builder.WriteString(" Core components (")
-	builder.WriteString(fmt.Sprintf("%d", len(self.Core)))
-	builder.WriteString(")\n")
-	for _, core := range self.Core {
+	builder.WriteString(fmt.Sprintf("%d", len(self.core)))
+	builder.WriteString(")\n\n")
+	for _, core := range self.core {
 		core.write(&builder)
 	}
 
@@ -263,9 +482,9 @@ func (self *ContainerStatus) String() string {
 	builder.WriteString("###")
 	builder.WriteString(colorReset)
 	builder.WriteString(" Test components (")
-	builder.WriteString(fmt.Sprintf("%d", len(self.Test)))
-	builder.WriteString(")\n")
-	for _, test := range self.Test {
+	builder.WriteString(fmt.Sprintf("%d", len(self.test)))
+	builder.WriteString(")\n\n")
+	for _, test := range self.test {
 		test.write(&builder)
 	}
 
@@ -274,9 +493,9 @@ func (self *ContainerStatus) String() string {
 	builder.WriteString("###")
 	builder.WriteString(colorReset)
 	builder.WriteString(" Component instances (")
-	builder.WriteString(fmt.Sprintf("%d", len(self.Instances)))
-	builder.WriteString(")\n")
-	for _, inst := range self.Instances {
+	builder.WriteString(fmt.Sprintf("%d", len(self.instances)))
+	builder.WriteString(")\n\n")
+	for _, inst := range self.instances {
 		inst.write(&builder)
 	}
 
@@ -284,4 +503,8 @@ func (self *ContainerStatus) String() string {
 
 	return builder.String()
 
+}
+
+func (self *containerStatusImpl) Print() {
+	fmt.Printf(self.String())
 }

@@ -29,7 +29,7 @@ var _ = Describe("IOC call", func() {
 		It("should be able to inject status", func() {
 
 			called := false
-			Expect(container.CallInjected(func(injected *ContainerStatus) {
+			Expect(container.CallInjected(func(injected ContainerStatus) {
 				called = true
 				Expect(injected.String()).To(Not(BeEmpty()))
 			})).To(Succeed())

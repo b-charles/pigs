@@ -23,48 +23,52 @@ type Container struct {
 	defaultComponents map[reflect.Type][]*component
 	coreComponents    map[reflect.Type][]*component
 	testComponents    map[reflect.Type][]*component
-	creationTime      time.Time
 	instances         map[*component]*instance
 	closables         []*instance
+	info              *component
 	status            *component
 }
 
 // NewContainer creates a new Container.
 func NewContainer() *Container {
 
+	creationTime := time.Now()
+
 	container := &Container{
 		defaultComponents: make(map[reflect.Type][]*component, 100),
 		coreComponents:    make(map[reflect.Type][]*component, 100),
 		testComponents:    make(map[reflect.Type][]*component, 10),
-		creationTime:      time.Now(),
 		instances:         make(map[*component]*instance, 100),
 		closables:         make([]*instance, 0, 100),
 	}
 
-	container.RegisterFactory(Core, "ContainerStatus", func() (*ContainerStatus, error) {
-		return &ContainerStatus{
-			container: container,
-		}, nil
-	})
-	container.status = container.coreComponents[containerStatus_type][0]
+	container.info, _ = container.register(Core, "Container info", nil, func() ContainerInfo {
+		return &containerInfoImpl{creationTime: creationTime}
+	}, []any{})
+
+	container.status, _ = container.register(Core, "Container status", nil, func() ContainerStatus {
+		return &containerStatusImpl{}
+	}, []any{})
 
 	return container
 
-}
-
-// CreationTime returns the creation time of the container.
-func (self *Container) CreationTime() time.Time {
-	return self.creationTime
 }
 
 // REGISTRATION
 
 // register records a component in the given scope by its name, its value, its factory and
 // signature functions. At least one of the arguments 'value' or 'factory' should be nil.
-func (self *Container) register(scope Scope, name string, value any, factory any, signFuncs []any) error {
+func (self *Container) register(
+	scope Scope,
+	name string,
+	value any,
+	factory any,
+	signFuncs []any) (*component, error) {
 
 	if comp, err := newComponent(name, value, factory, signFuncs); err != nil {
-		return err
+
+		return nil, err
+
 	} else {
 
 		components := self.getComponentMap(scope)
@@ -79,22 +83,24 @@ func (self *Container) register(scope Scope, name string, value any, factory any
 			}
 		}
 
-	}
+		return comp, nil
 
-	return nil
+	}
 
 }
 
 // RegisterComponent creates a new component in the given scope by its name,
 // value and signature functions.
 func (self *Container) RegisterComponent(scope Scope, name string, value any, signFuncs ...any) error {
-	return self.register(scope, name, value, nil, signFuncs)
+	_, err := self.register(scope, name, value, nil, signFuncs)
+	return err
 }
 
 // RegisterFactory creates a new component in the given scope by its name, factory and
 // signature functions.
 func (self *Container) RegisterFactory(scope Scope, name string, factory any, signFuncs ...any) error {
-	return self.register(scope, name, nil, factory, signFuncs)
+	_, err := self.register(scope, name, nil, factory, signFuncs)
+	return err
 }
 
 // INTERNAL RESOLUTION
@@ -358,19 +364,6 @@ func (self *Container) callInjected(method reflect.Value, stack *componentStack)
 
 // EXTERNAL RESOLUTION
 
-func (self *Container) isInTestEnv() (bool, error) {
-	for _, components := range self.testComponents {
-		for _, comp := range components {
-			if instance, err := self.instanciate(comp, newComponentStack()); err != nil {
-				return false, err
-			} else if !instance.isNil() {
-				return true, nil
-			}
-		}
-	}
-	return false, nil
-}
-
 // CallInjected call the given method, injecting its arguments.
 func (self *Container) CallInjected(method any) error {
 
@@ -406,33 +399,45 @@ func (self *Container) CallInjected(method any) error {
 		return err
 	}
 
-	// instanciates all test components to check if running in test environment
-	isTestEnv, err := self.isInTestEnv()
-	if err != nil {
-		return err
+	// specials
+
+	var info   *containerInfoImpl
+	if instance, present := self.instances[self.info]; present {
+		info = instance.value.Interface().(*containerInfoImpl)
 	}
 
-	// update status
-	if status, present := self.instances[self.status]; present {
-		status.value.Interface().(*ContainerStatus).update()
+	if instance, present := self.instances[self.status]; present {
+    status := instance.value.Interface().(*containerStatusImpl)
+		status.update(self)
 	}
 
 	// release instances
 
+	testMode := len(self.testComponents) > 0
+
 	self.instances = make(map[*component]*instance)
-	if isTestEnv {
+	if testMode {
 		self.testComponents = map[reflect.Type][]*component{}
 	} else {
 		self.defaultComponents = map[reflect.Type][]*component{}
 		self.coreComponents = map[reflect.Type][]*component{}
+		self.status = nil
+		self.info = nil
+	}
+
+	// update special info
+	if info != nil {
+		info.start(self, testMode)
 	}
 
 	// calling
-
 	outs := methodValue.Call(args)
 
-	// output
+	if info != nil {
+		info.close(self)
+	}
 
+	// output
 	if nout == 1 {
 		return outs[0].Interface().(error)
 	} else {

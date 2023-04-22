@@ -33,7 +33,7 @@ A component is something: a struct, a pointer, a map, a chan, an integer... It's
  * and optionally some _signature_ interfaces which are some additional interfaces implemented by the component[^duck]. Multiple components can share the same main type and signatures to enable auto-discovery, but that concept can be confusing and error-prone: it can be considered good practice to register each component with a specific and unique main type, and using signatures only when auto-discovery is needed.
 Any component with a value `nil` will be silently discarded and never be injected in another component. This behaviour, together with auto-discovery and scopes features, helps implement conditional component creation.
 
-A container is a set of components: it manages the lifecycle of each component and take in charge the injection process. The framework defines one instance of this container and redirect all API calls to that container.
+A container is a set of components: it manages the lifecycle of each component and take in charge the injection process. The framework defines one instance of this container and redirect all API calls to that container. The container defines by itself two special components of type `ioc.ContainerStatus` and `ioc.ContainerInfo` (see [Special components](#special-components)), and the framework defines also some components for classical integration (see [Default integration](#default-integration)).
 
 [^duck]: The concept of signature is not very in line with the spirit of the duck typing of Go, but it's a need for performance (what should be injected, without checking each component) and flexibility (what should *not* be injected, even if the interface matches the implementation).
 
@@ -228,11 +228,11 @@ After the main function executed, the container will close automatically every c
 
 ### Redefinition
 
-It should be only one call of `CallInjected` during the run of the application or at each unit test: after a call of `CallInjected`, every instances are released along the component definitions (default and core) if no test components are found or the associated instances are `nil`. Otherwise, if at least one component is defined in the test scope and its instance is not `nil`, instances of all scopes and component definitions of test scope only are released.
+It should be only one call of `CallInjected` during the run of the application or at each unit test: after a call of `CallInjected`, every instances are released along the component definitions (default and core) if no test components are found. Otherwise, if at least one component is defined in the test scope (even if it is not instanciated or injected in another component), instances of all scopes and component definitions of test scope only are released.
 
-So, if you are running unit tests, you have to defined some fixture to redefined each time all the test components you want to use, and for each test, every component is re-instanced. Be sure to define at least one component (with a not `nil` value, e.g. a random string is enough) in the test scope, even if it is not used, before each call of `CallInjected` or you will loosing the definitions of all the core components.
+So, if you are running unit tests, you have to defined some fixture to redefined each time all the test components you want to use, and for each test, every component is re-instanced. Be sure to define at least one component in the test scope, even if it is not used, before each call of `CallInjected` or you will loosing the definitions of all the core components.
 
-If no test component are defined, the framework considers that you are really running your application. In this case, in order to consume the least RAM as possible, all unused component instances and all component definitions will be released (forgotten by the framework) and can be deleted by the garbage collector if no other component reference them.
+If no test component is defined, the framework considers that you are really running your application. In this case, in order to consume the least RAM as possible, all unused component instances and all component definitions will be released (forgotten by the framework) and can be deleted by the garbage collector if no other component reference them.
 
 ## Usage example
 
@@ -334,6 +334,24 @@ var _ = Describe("App tests", func() {
 
 })
 ```
+
+## Special components
+
+### Container status
+
+A special component of type `ioc.ContainerStatus` is defined by the container itself and can be used to analyse and display the internal status of the container. The usage of this component should be limited to a temporary debugging, since injecting this component will maintain a reference to all other components and instances, preventing the garbage collector to release anything recorded in the container.
+
+The `String` and `Print` methods produce gorgious outputs which should be easy enough to understand without a detailed documentation.
+
+### Container info
+
+A special component  of type `ioc.ContainerInfo` is also defined by the container. It can be injected to get some information about the usage of the container:
+ * `TestMode()` returns `true` if the container is used in a test environment, i.e. if at least one test component is recorded.
+ * `CreationTime()` returns the time of the container creation.
+ * `StartingTime()` returns the time of the call of `CallInjected` function.
+ * `ClosingTime()` returns the time of the end of the `CallInjected` function. The returned time is the zero value until the `CallInjected` ends, and can be used in the `Close` methods of the components.
+
+Times are generated by using the standard `time` package, and ignore [the Clock integration](#clock). During tests, the container is created once, so the creation time will be constant for all tests, and the starting and closing times are updated at each unit test.
 
 ## Default integration
 
