@@ -128,7 +128,7 @@ func init() {
 ```
 When a component is registered with signatures, the framework checks that the component can be casted to each signature type and panics if this is not the case.
 
-Use can also give a name or a label to the component, using the function `ioc.PutNamed`:
+You can also give a name or a label to the component, using the function `ioc.PutNamed`:
 ```go
 type DemoComponent struct { ... }
 
