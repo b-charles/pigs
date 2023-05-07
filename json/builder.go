@@ -5,6 +5,12 @@ import (
 	"strconv"
 )
 
+var escapedcharsregexp = regexp.MustCompile(`\.|\[`)
+
+func EscapePath(path string) string {
+	return escapedcharsregexp.ReplaceAllString(path, "\\$0")
+}
+
 type jsonBuilderNode struct {
 	value    JsonNode
 	children *sortedMap[*jsonBuilderNode]
@@ -74,7 +80,7 @@ func (self *jsonBuilderNode) arrayCheck() (bool, map[string]int, int) {
 	max := 0
 
 	for _, k := range self.children.s {
-		if k[0] != '[' {
+		if len(k) == 0 || k[0] != '[' {
 			return false, nil, 0
 		} else if v, err := strconv.Atoi(k[1:]); err != nil {
 			return false, nil, 0
@@ -102,7 +108,10 @@ func (self *JsonBuilder) Build() JsonNode {
 	return self.root.json()
 }
 
-var pathregexp = regexp.MustCompile(`\.?([^.\[]+)|(\[\d+)\]`)
+var (
+	pathregexp  = regexp.MustCompile(`(\[\d+)\]|((\\.|[^.\[])*)`)
+	escapedrexp = regexp.MustCompile(`\\(.)`)
+)
 
 func parsePath(path string) []string {
 
@@ -110,10 +119,10 @@ func parsePath(path string) []string {
 
 	paths := make([]string, 0, len(parsed))
 	for _, p := range parsed {
-		if p[2] != "" {
-			paths = append(paths, p[2])
-		} else {
+		if p[1] != "" {
 			paths = append(paths, p[1])
+		} else {
+			paths = append(paths, escapedrexp.ReplaceAllString(p[2], "$1"))
 		}
 	}
 

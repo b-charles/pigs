@@ -48,6 +48,12 @@ func (self *dododoer_impl) Do()     {}
 func (self *dododoer_impl) DoDo()   {}
 func (self *dododoer_impl) DoDoDo() {}
 
+type myJsoner struct{}
+
+func (self *myJsoner) Json() JsonNode {
+	return JsonString("ANGRY JSONER")
+}
+
 var _ = Describe("Json marshallers", func() {
 
 	BeforeEach(func() {
@@ -65,6 +71,16 @@ var _ = Describe("Json marshallers", func() {
 
 			testMarshall(jsons, true, `true`)
 			testMarshall(jsons, false, `false`)
+
+		})
+
+	})
+
+	It("should marshall Jsoner interfaces", func() {
+
+		ioc.CallInjected(func(json Jsons) {
+
+			testMarshall(json, &myJsoner{}, `"ANGRY JSONER"`)
 
 		})
 

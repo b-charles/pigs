@@ -17,30 +17,40 @@ type ErrorMarshaller func(v error) (JsonNode, error)
 
 func init() {
 
-	ioc.DefaultPut(func(v string) (JsonNode, error) {
-		return JsonString(v), nil
-	}, func(StringMarshaller) {})
-	ioc.PutFactory(func(m StringMarshaller) (JsonMarshaller, error) { return m, nil })
+	ioc.DefaultPutNamed("String Json marshaller (default)",
+		func(v string) (JsonNode, error) {
+			return JsonString(v), nil
+		}, func(StringMarshaller) {})
+	ioc.PutNamedFactory("String Json marshaller (promoter)",
+		func(m StringMarshaller) (JsonMarshaller, error) { return m, nil })
 
-	ioc.DefaultPut(func(v float64) (JsonNode, error) {
-		return JsonFloat(v), nil
-	}, func(Float64Marshaller) {})
-	ioc.PutFactory(func(m Float64Marshaller) (JsonMarshaller, error) { return m, nil })
+	ioc.DefaultPutNamed("Float64 Json marshaller (default)",
+		func(v float64) (JsonNode, error) {
+			return JsonFloat(v), nil
+		}, func(Float64Marshaller) {})
+	ioc.PutNamedFactory("Float64 Json marshaller (promoter)",
+		func(m Float64Marshaller) (JsonMarshaller, error) { return m, nil })
 
-	ioc.DefaultPut(func(v int) (JsonNode, error) {
-		return JsonInt(v), nil
-	}, func(IntMarshaller) {})
-	ioc.PutFactory(func(m IntMarshaller) (JsonMarshaller, error) { return m, nil })
+	ioc.DefaultPutNamed("Int Json marshaller (default)",
+		func(v int) (JsonNode, error) {
+			return JsonInt(v), nil
+		}, func(IntMarshaller) {})
+	ioc.PutNamedFactory("Int Json marshaller (promoter)",
+		func(m IntMarshaller) (JsonMarshaller, error) { return m, nil })
 
-	ioc.DefaultPut(func(v bool) (JsonNode, error) {
-		return JsonBool(v), nil
-	}, func(BoolMarshaller) {})
-	ioc.PutFactory(func(m BoolMarshaller) (JsonMarshaller, error) { return m, nil })
+	ioc.DefaultPutNamed("Bool Json marshaller (default)",
+		func(v bool) (JsonNode, error) {
+			return JsonBool(v), nil
+		}, func(BoolMarshaller) {})
+	ioc.PutNamedFactory("Bool Json marshaller (promoter)",
+		func(m BoolMarshaller) (JsonMarshaller, error) { return m, nil })
 
-	ioc.DefaultPut(func(v error) (JsonNode, error) {
-		return JsonString(v.Error()), nil
-	}, func(ErrorMarshaller) {})
-	ioc.PutFactory(func(m ErrorMarshaller) (JsonMarshaller, error) { return m, nil })
+	ioc.DefaultPutNamed("Error Json marshaller (default)",
+		func(v error) (JsonNode, error) {
+			return JsonString(v.Error()), nil
+		}, func(ErrorMarshaller) {})
+	ioc.PutNamedFactory("Error Json marshaller (promoter)",
+		func(m ErrorMarshaller) (JsonMarshaller, error) { return m, nil })
 
 }
 
@@ -48,33 +58,60 @@ func init() {
 
 func init() {
 
-	ioc.Put(func(v JsonString) (JsonNode, error) {
-		return v, nil
-	}, func(JsonMarshaller) {})
+	ioc.PutNamed("JsonString marshaller",
+		func(v JsonString) (JsonNode, error) {
+			return v, nil
+		}, func(JsonMarshaller) {})
 
-	ioc.Put(func(v JsonFloat) (JsonNode, error) {
-		return v, nil
-	}, func(JsonMarshaller) {})
+	ioc.PutNamed("JsonFloat marshaller",
+		func(v JsonFloat) (JsonNode, error) {
+			return v, nil
+		}, func(JsonMarshaller) {})
 
-	ioc.Put(func(v JsonInt) (JsonNode, error) {
-		return v, nil
-	}, func(JsonMarshaller) {})
+	ioc.PutNamed("JsonInt marshaller",
+		func(v JsonInt) (JsonNode, error) {
+			return v, nil
+		}, func(JsonMarshaller) {})
 
-	ioc.Put(func(v JsonBool) (JsonNode, error) {
-		return v, nil
-	}, func(JsonMarshaller) {})
+	ioc.PutNamed("JsonBool marshaller",
+		func(v JsonBool) (JsonNode, error) {
+			return v, nil
+		}, func(JsonMarshaller) {})
 
-	ioc.Put(func(v *JsonObject) (JsonNode, error) {
-		return v, nil
-	}, func(JsonMarshaller) {})
+	ioc.PutNamed("JsonObject marshaller",
+		func(v *JsonObject) (JsonNode, error) {
+			return v, nil
+		}, func(JsonMarshaller) {})
 
-	ioc.Put(func(v *JsonArray) (JsonNode, error) {
-		return v, nil
-	}, func(JsonMarshaller) {})
+	ioc.PutNamed("JsonArray marshaller",
+		func(v *JsonArray) (JsonNode, error) {
+			return v, nil
+		}, func(JsonMarshaller) {})
 
-	ioc.Put(func(v JsonNull) (JsonNode, error) {
-		return v, nil
-	}, func(JsonMarshaller) {})
+	ioc.PutNamed("JsonNull marshaller",
+		func(v JsonNull) (JsonNode, error) {
+			return v, nil
+		}, func(JsonMarshaller) {})
+
+}
+
+// Jsoner marshaller
+
+type Jsoner interface {
+	Json() JsonNode
+}
+
+func newJsonerMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller *wrappedMarshaller) error {
+
+	if !target.Implements(jsonerType) {
+		return fmt.Errorf("The target %v doesn't implements the Jsoner interface.", target)
+	}
+
+	valueMarshaller.f = func(v reflect.Value) (JsonNode, error) {
+		return v.Interface().(Jsoner).Json(), nil
+	}
+
+	return nil
 
 }
 

@@ -35,8 +35,9 @@ func (self *BufferedWriterAppender) Close() error {
 
 func init() {
 
-	ioc.DefaultPutFactory(func() (*BufferedWriterAppender, error) {
-		return NewBufferedWriterAppender(os.Stdout), nil
-	}, func(Appender) {})
+	ioc.DefaultPutNamedFactory("Std out appender",
+		func() (*BufferedWriterAppender, error) {
+			return NewBufferedWriterAppender(os.Stdout), nil
+		}, func(Appender) {})
 
 }

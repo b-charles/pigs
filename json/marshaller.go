@@ -9,13 +9,8 @@ import (
 type JsonMarshaller any
 
 type wrappedMarshaller struct {
-	src JsonMarshaller
-	t   reflect.Type
-	f   func(reflect.Value) (JsonNode, error)
-}
-
-func (self *wrappedMarshaller) String() string {
-	return fmt.Sprint(self.src)
+	t reflect.Type
+	f func(reflect.Value) (JsonNode, error)
 }
 
 func wrapMarshaller(marshaller JsonMarshaller) (*wrappedMarshaller, error) {
@@ -40,6 +35,6 @@ func wrapMarshaller(marshaller JsonMarshaller) (*wrappedMarshaller, error) {
 		}
 	}
 
-	return &wrappedMarshaller{marshaller, t.In(0), f}, nil
+	return &wrappedMarshaller{t.In(0), f}, nil
 
 }

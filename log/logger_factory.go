@@ -28,12 +28,13 @@ func (self *loggerFactoryImpl) NewLogger(name string) Logger {
 
 func init() {
 
-	ioc.DefaultPutFactory(func(
-		jsons json.Jsons,
-		levelConfigurer LevelConfigurer,
-		contextualizers []Contextualizer,
-		appenders []Appender) (*loggerFactoryImpl, error) {
-		return &loggerFactoryImpl{jsons, levelConfigurer, contextualizers, appenders}, nil
-	}, func(LoggerFactory) {})
+	ioc.DefaultPutNamedFactory("Logger factory",
+		func(
+			jsons json.Jsons,
+			levelConfigurer LevelConfigurer,
+			contextualizers []Contextualizer,
+			appenders []Appender) (*loggerFactoryImpl, error) {
+			return &loggerFactoryImpl{jsons, levelConfigurer, contextualizers, appenders}, nil
+		}, func(LoggerFactory) {})
 
 }

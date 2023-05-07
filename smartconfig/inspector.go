@@ -30,7 +30,6 @@ func inspectorConfigurer(inspector Inspector) (*configurer, error) {
 	}
 
 	return &configurer{
-		source: inspector,
 		target: typ.Out(0),
 		setter: func(config NavConfig, receiver reflect.Value) error {
 

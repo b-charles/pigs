@@ -41,6 +41,10 @@ func (self Level) String() string {
 
 }
 
+func (self Level) Json() json.JsonNode {
+	return json.JsonString(self.String())
+}
+
 func ParseLevel(value string) (Level, error) {
 	trim := strings.ToUpper(strings.TrimSpace(value))
 	switch {
@@ -65,13 +69,15 @@ func ParseLevel(value string) (Level, error) {
 
 func init() {
 
-	ioc.Put(func(level Level) (json.JsonNode, error) {
-		return json.JsonString(level.String()), nil
-	}, func(json.JsonMarshaller) {})
-	ioc.Put(func(node json.JsonNode) (Level, error) {
-		return ParseLevel(node.AsString())
-	}, func(json.JsonUnmarshaller) {})
+	ioc.PutNamed("Log level Json marshaller",
+		func(level Level) (json.JsonNode, error) {
+			return level.Json(), nil
+		}, func(json.JsonMarshaller) {})
+	ioc.PutNamed("Log level Json unmarshaller",
+		func(node json.JsonNode) (Level, error) {
+			return ParseLevel(node.AsString())
+		}, func(json.JsonUnmarshaller) {})
 
-	ioc.Put(ParseLevel, func(smartconfig.Parser) {})
+	ioc.PutNamed("Log level parser", ParseLevel, func(smartconfig.Parser) {})
 
 }

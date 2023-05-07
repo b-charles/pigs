@@ -26,9 +26,10 @@ func (self *DefaultContextualizer) AddContext(logger Logger, level Level, builde
 
 func init() {
 
-	ioc.DefaultPutFactory(func(clock clock.Clock) *DefaultContextualizer {
-		return &DefaultContextualizer{clock}
-	}, func(Contextualizer) {})
+	ioc.DefaultPutNamedFactory("Time and level contextualizer",
+		func(clock clock.Clock) *DefaultContextualizer {
+			return &DefaultContextualizer{clock}
+		}, func(Contextualizer) {})
 
 }
 

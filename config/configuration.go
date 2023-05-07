@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/b-charles/pigs/ioc"
+	"github.com/b-charles/pigs/json"
 )
 
 /*
@@ -130,8 +131,12 @@ func (self *configImpl) Set(key, value string) {
 	self.raws[key] = value
 }
 
+func (self *configImpl) Json() json.JsonNode {
+	return json.NewJsonObjectStrings(self.raws)
+}
+
 func (self *configImpl) String() string {
-	return stringify(self.raws)
+	return self.Json().String()
 }
 
 /*
@@ -186,8 +191,10 @@ func (self *CyclicLoopError) Error() string {
  * Default
  */
 
-var defaultConfigMap map[string]string
-var onceDefaultConfigMap sync.Once
+var (
+	defaultConfigMap     map[string]string
+	onceDefaultConfigMap sync.Once
+)
 
 func getDefaultConfigMap() map[string]string {
 
@@ -268,5 +275,7 @@ func CreateConfiguration(sources []ConfigSource) (Configuration, error) {
 }
 
 func init() {
-	ioc.PutFactory(CreateConfiguration)
+
+	ioc.PutNamedFactory("Configuration", CreateConfiguration)
+
 }

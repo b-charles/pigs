@@ -62,6 +62,10 @@ func (self JsonNull) IsNull() bool {
 	return true
 }
 
+func (self JsonNull) Append(b []byte) []byte {
+	return append(b, 'n', 'u', 'l', 'l')
+}
+
 func (self JsonNull) String() string {
 	return "null"
 }

@@ -62,6 +62,14 @@ func (self JsonBool) IsNull() bool {
 	return false
 }
 
+func (self JsonBool) Append(b []byte) []byte {
+	if bool(self) {
+		return append(b, 't', 'r', 'u', 'e')
+	} else {
+		return append(b, 'f', 'a', 'l', 's', 'e')
+	}
+}
+
 func (self JsonBool) String() string {
 	if bool(self) {
 		return "true"

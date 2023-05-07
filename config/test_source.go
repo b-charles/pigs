@@ -1,10 +1,10 @@
 package config
 
 import (
-	"fmt"
 	"sync/atomic"
 
 	"github.com/b-charles/pigs/ioc"
+	"github.com/b-charles/pigs/json"
 )
 
 /*
@@ -46,6 +46,10 @@ func (self *TestSourceEntry) LoadEnv(config MutableConfig) error {
 
 }
 
+func (self *TestSourceEntry) Json() json.JsonNode {
+	return json.NewJsonObjectStrings(self.values)
+}
+
 func (self *TestSourceEntry) String() string {
-	return fmt.Sprintf("Test entries: %s", stringify(self.values))
+	return self.Json().String()
 }

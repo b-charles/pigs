@@ -1,6 +1,9 @@
 package json
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 type JsonFloat float64
 
@@ -62,6 +65,10 @@ func (self JsonFloat) GetElement(int) JsonNode {
 
 func (self JsonFloat) IsNull() bool {
 	return false
+}
+
+func (self JsonFloat) Append(b []byte) []byte {
+	return strconv.AppendFloat(b, float64(self), 'g', -1, 64)
 }
 
 func (self JsonFloat) String() string {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/b-charles/pigs/config"
 	"github.com/b-charles/pigs/ioc"
+	"github.com/b-charles/pigs/json"
 )
 
 type NavConfig interface {
@@ -118,6 +119,47 @@ func (self *navConfigImpl) Get(key string) NavConfig {
 
 }
 
+func (self *navConfigImpl) Json() json.JsonNode {
+
+	if self == nil {
+
+		return json.JSON_NULL
+
+	} else if len(self.children) > 0 {
+
+		keys := make([]string, 0, len(self.children))
+		for k := range self.children {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		b := json.NewJsonBuilder()
+
+		if self.value != "" {
+			b.SetString(".", self.value)
+		}
+		for _, k := range keys {
+			b.Set(json.EscapePath(k), self.children[k].Json())
+		}
+
+		return b.Build()
+
+	} else if self.value != "" {
+
+		return json.JsonString(self.value)
+
+	} else {
+
+		return json.JSON_NULL
+
+	}
+
+}
+
+func (self *navConfigImpl) String() string {
+	return self.Json().String()
+}
+
 func NewNavMap(config config.Configuration) (NavConfig, error) {
 
 	root := &navConfigImpl{nil, nil, "", "", map[string]*navConfigImpl{}}
@@ -143,5 +185,7 @@ func insert(keys []string, value string, navKey *navConfigImpl) {
 }
 
 func init() {
-	ioc.PutFactory(NewNavMap, func(NavConfig) {})
+	ioc.PutNamedFactory("Navigable configuration",
+		NewNavMap,
+		func(NavConfig) {})
 }

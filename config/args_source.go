@@ -6,11 +6,14 @@ import (
 	"regexp"
 
 	"github.com/b-charles/pigs/ioc"
+	"github.com/b-charles/pigs/json"
 )
 
-var valueRegexp *regexp.Regexp = regexp.MustCompile("^--?([^=]+)=(.*)$")
-var valueRegexpSimple *regexp.Regexp = regexp.MustCompile("^--?([^=]+)='(.*)'$")
-var valueRegexpDouble *regexp.Regexp = regexp.MustCompile("^--?([^=]+)=\"(.*)\"$")
+var (
+	valueRegexp       *regexp.Regexp = regexp.MustCompile("^--?([^=]+)=(.*)$")
+	valueRegexpSimple *regexp.Regexp = regexp.MustCompile("^--?([^=]+)='(.*)'$")
+	valueRegexpDouble *regexp.Regexp = regexp.MustCompile("^--?([^=]+)=\"(.*)\"$")
+)
 
 func keyvalueArg(arg string) (string, string, bool) {
 
@@ -30,8 +33,10 @@ func keyvalueArg(arg string) (string, string, bool) {
 
 }
 
-var boolRegexp *regexp.Regexp = regexp.MustCompile("^--?([^=]+)$")
-var noboolRegexp *regexp.Regexp = regexp.MustCompile("^--?no-([^=]+)$")
+var (
+	boolRegexp   *regexp.Regexp = regexp.MustCompile("^--?([^=]+)$")
+	noboolRegexp *regexp.Regexp = regexp.MustCompile("^--?no-([^=]+)$")
+)
 
 func keyboolArg(arg string) (string, string, bool) {
 
@@ -65,7 +70,7 @@ func ParseArgs(args []string) (map[string]string, error) {
 			continue
 		}
 
-		return nil, fmt.Errorf("Can't parse argument '%s': unknown pattern.", arg)
+		return env, fmt.Errorf("Can't parse argument '%s': unknown pattern.", arg)
 
 	}
 
@@ -73,27 +78,37 @@ func ParseArgs(args []string) (map[string]string, error) {
 
 }
 
-type ArgsConfigSource map[string]string
+type ArgsConfigSource struct {
+	source map[string]string
+}
 
-func (self ArgsConfigSource) GetPriority() int {
+func (self *ArgsConfigSource) GetPriority() int {
 	return CONFIG_SOURCE_PRIORITY_ARGS
 }
 
-func (self ArgsConfigSource) LoadEnv(config MutableConfig) error {
-	for k, v := range self {
+func (self *ArgsConfigSource) LoadEnv(config MutableConfig) error {
+	for k, v := range self.source {
 		config.Set(k, v)
 	}
 	return nil
 }
 
-func (self ArgsConfigSource) String() string {
-	return fmt.Sprintf("Arguments: %s", stringify(self))
+func (self *ArgsConfigSource) Json() json.JsonNode {
+	return json.NewJsonObjectStrings(self.source)
 }
 
-func NewArgsConfigSource() (ArgsConfigSource, error) {
-	return ParseArgs(os.Args[1:])
+func (self *ArgsConfigSource) String() string {
+	return self.Json().String()
+}
+
+func NewArgsConfigSource() (*ArgsConfigSource, error) {
+	m, err := ParseArgs(os.Args[1:])
+	return &ArgsConfigSource{m}, err
 }
 
 func init() {
-	ioc.PutFactory(NewArgsConfigSource, func(ConfigSource) {})
+
+	ioc.PutNamedFactory("Args config source",
+		NewArgsConfigSource, func(ConfigSource) {})
+
 }

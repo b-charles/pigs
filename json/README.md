@@ -32,25 +32,33 @@ To create a JsonNode, you can:
     ```go
     b := NewJsonBuilder()
     b.SetString("a", "hello") // Simple object field
-    b.SetString("b.c.d", "world") // Nested object fields
+    b.SetString("b.c\\.d", "world") // Nested object fields
     b.SetBool("e[0]", true) // Array
     b.SetInt("e[1].f", 42) // Mixing object and array
     node := b.Build()
     
-    fmt.Print(node.String()) // expect `{"a":"hello","b":{"c":{"d":"world"}},"e":[true,{"f":42}]}`
+    fmt.Print(node.String()) // expect `{"a":"hello","b":{"c.d":"world"},"e":[true,{"f":42}]}`
     ```
+   The function `EscapePath` can be useful to escape special characters (`.` and `[`) in the path.
 
 ## Json lib
 
-The library defines _marshallers_ and _unmarshallers_, which are ioc components used to convert a value to Json and vice versa. A marshaller should be defined as a `func(T) (core.JsonNode, error)` where `T` is the supported marshallable type. An unmarshaller should be defined as a `func(core.JsonNode) (T, error)` where `T` is again the supported unmarshallable type. Depending the usage, some type can be associate to only a marshaller or an unmarshaller, but several marshallers or unmarshallers can not be defined with the same type target.
+The library defines _marshallers_ and _unmarshallers_, which are ioc components used to convert a value to Json and vice versa. A marshaller should be defined as a `func(T) (JsonNode, error)` where `T` is the supported marshallable type. An unmarshaller should be defined as a `func(JsonNode) (T, error)` where `T` is again the supported unmarshallable type. Depending the usage, some type can be associate to only a marshaller or an unmarshaller, but several marshallers or unmarshallers can not be defined with the same type target.
+
+The library will create automatically a marshaller for any type without an associated marshaller but implementing the `Jsoner` interface:
+```go
+type Jsoner interface {
+	Json() JsonNode
+}
+```
 
 All marshallers and unmarshallers are grouped and can be called from an interface `Jsons` with several methods:
- * The method `Marshal(any) (core.JsonNode, error)` use the correct marshaller to produce a `JsonNode`.
+ * The method `Marshal(any) (JsonNode, error)` use the correct marshaller to produce a `JsonNode`.
  * The method `MarshalToString(any) (string, error)` add a step to the `Marshal` method and convert the `JsonNode` to a `string`.
- * The method `Unmarshal(json core.JsonNode, callback func(T)) error` convert a node to a value and call the callback function with that value. The expected type is computed by looking at the callback argument.
+ * The method `Unmarshal(json JsonNode, callback func(T)) error` convert a node to a value and call the callback function with that value. The expected type is computed by looking at the callback argument.
  * The method `UnmarshalFromString(json string, callback func(T)) error` parse the given string before calling the method `Unmarshal`.
 
-The json component will do his best to handle marshallers defined for interfaces and try to select the best matching interface to a given unkown instance. But this kind of marshallers will slow down the all processes, and marshallers defined on concrete types (not interface) should be prefered. 
+The json component will do his best to handle marshallers defined for interfaces and try to select the best matching interface to a given unkown instance. But this kind of marshallers will slow down the all process, and marshallers defined on concrete types (not interface) should be prefered. 
 
 The lib defines some marshallers and unmarshallers. In order to be able to overwrite the default implementation but in the same time includes the implementation in the core scope, the default (un)marshallers are defined in 3 steps:
  * An interface is defined, with the same signature than a dedicated marshaller but without refencing it: e.g. for string marshalling:
@@ -59,13 +67,15 @@ The lib defines some marshallers and unmarshallers. In order to be able to overw
     ```
  * A default implementation of this interface is defined in the default scope. Again for string:
     ```go
-    ioc.DefaultPut(func(v string) (JsonNode, error) {
-        return JsonString(v), nil
-    }, func(StringMarshaller) {})
+	ioc.DefaultPutNamed("String Json marshaller (default)",
+		func(v string) (JsonNode, error) {
+			return JsonString(v), nil
+		}, func(StringMarshaller) {})
     ```
  * Then, a factory is defined to promote the interface implementation as a valid (un)marshaller in the core scope:
     ```go
-	ioc.PutFactory(func(m StringMarshaller) (JsonMarshaller, error) { return m, nil })
+	ioc.PutNamedFactory("String Json marshaller (promoter)",
+		func(m StringMarshaller) (JsonMarshaller, error) { return m, nil })
     ```
 So, to overwrite an implementation, you have to register a component implementing the specific interface in the core or test scope. The default implementation and associated interfaces are:
 

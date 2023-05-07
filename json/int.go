@@ -1,6 +1,9 @@
 package json
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 type JsonInt int
 
@@ -62,6 +65,10 @@ func (self JsonInt) GetElement(int) JsonNode {
 
 func (self JsonInt) IsNull() bool {
 	return false
+}
+
+func (self JsonInt) Append(b []byte) []byte {
+	return strconv.AppendInt(b, int64(self), 10)
 }
 
 func (self JsonInt) String() string {

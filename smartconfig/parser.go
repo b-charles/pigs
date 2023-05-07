@@ -3,23 +3,10 @@ package smartconfig
 import (
 	"fmt"
 	"reflect"
-	"strconv"
-
-	"github.com/b-charles/pigs/ioc"
 )
 
 // type Parser func(string) (any, error)
 type Parser any
-
-func init() {
-
-	ioc.Put(func(value string) (string, error) {
-		return value, nil
-	}, func(Parser) {})
-	ioc.Put(strconv.ParseBool, func(Parser) {})
-	ioc.Put(strconv.Atoi, func(Parser) {})
-
-}
 
 func parserConfigurer(parser Parser) (*configurer, error) {
 
@@ -43,7 +30,6 @@ func parserConfigurer(parser Parser) (*configurer, error) {
 	}
 
 	return &configurer{
-		source: parser,
 		target: typ.Out(0),
 		setter: func(config NavConfig, receiver reflect.Value) error {
 

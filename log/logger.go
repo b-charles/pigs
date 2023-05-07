@@ -179,10 +179,6 @@ func (self *loggerImpl) AddContext(key string, value any) Logger {
 	return self.AddContextualizer(newStaticContextualizer(key, value))
 }
 
-func (self *loggerImpl) String() string {
-	return fmt.Sprintf("Logger '%s'", self.name)
-}
-
 var DEFAULT_LOGGER_NAME = "root"
 
 func init() {
@@ -190,8 +186,9 @@ func init() {
 	config.Set(ROOT_CONFIG, Info.String())
 	config.Set(fmt.Sprintf("%s.%s", ROOT_CONFIG, DEFAULT_LOGGER_NAME), fmt.Sprintf("${%s}", ROOT_CONFIG))
 
-	ioc.DefaultPutFactory(func(loggerFactory LoggerFactory) (Logger, error) {
-		return loggerFactory.NewLogger(DEFAULT_LOGGER_NAME), nil
-	}, func(Logger) {})
+	ioc.DefaultPutNamedFactory(fmt.Sprintf("Logger '%s'", DEFAULT_LOGGER_NAME),
+		func(loggerFactory LoggerFactory) (Logger, error) {
+			return loggerFactory.NewLogger(DEFAULT_LOGGER_NAME), nil
+		}, func(Logger) {})
 
 }

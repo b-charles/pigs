@@ -1,16 +1,35 @@
 package json
 
-import (
-	"fmt"
-	"strings"
-)
-
 type JsonArray struct {
 	elements []JsonNode
 }
 
+func NewJsonArrayMapped[T any](elements []T, mapper func(v T) JsonNode) *JsonArray {
+	elts := make([]JsonNode, 0, len(elements))
+	for _, k := range elements {
+		elts = append(elts, mapper(k))
+	}
+	return &JsonArray{elts}
+}
+
 func NewJsonArray(elements []JsonNode) *JsonArray {
 	return &JsonArray{elements}
+}
+
+func NewJsonArrayStrings(elements []string) *JsonArray {
+	return NewJsonArrayMapped(elements, stringToJson)
+}
+
+func NewJsonArrayFloats(elements []float64) *JsonArray {
+	return NewJsonArrayMapped(elements, floatToJson)
+}
+
+func NewJsonArrayInts(elements []int) *JsonArray {
+	return NewJsonArrayMapped(elements, intToJson)
+}
+
+func NewJsonArrayBools(elements []bool) *JsonArray {
+	return NewJsonArrayMapped(elements, boolToJson)
 }
 
 var JSON_EMPTY_ARRAY = &JsonArray{[]JsonNode{}}
@@ -82,23 +101,27 @@ func (self *JsonArray) IsNull() bool {
 	return false
 }
 
-func (self *JsonArray) String() string {
+func (self *JsonArray) Append(b []byte) []byte {
 
 	l := len(self.elements)
 	if l == 0 {
-		return "[]"
+		return append(b, '[', ']')
 	}
 
-	var b strings.Builder
-	fmt.Fprint(&b, "[")
-
-	b.WriteString(self.GetElement(0).String())
+	b = append(b, '[')
+	b = self.GetElement(0).Append(b)
 	for i := 1; i < l; i++ {
-		b.WriteRune(',')
-		b.WriteString(self.GetElement(i).String())
+		b = append(b, ',')
+		b = self.GetElement(i).Append(b)
 	}
 
-	fmt.Fprint(&b, "]")
-	return b.String()
+	b = append(b, ']')
+	return b
 
+}
+
+func (self *JsonArray) String() string {
+	b := make([]byte, 0, 50)
+	b = self.Append(b)
+	return string(b)
 }

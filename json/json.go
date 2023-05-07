@@ -3,14 +3,9 @@ package json
 import (
 	"fmt"
 	"reflect"
-	"sort"
 
 	"github.com/b-charles/pigs/ioc"
 )
-
-var errorType = reflect.TypeOf(func(error) {}).In(0)
-var stringType = reflect.TypeOf(func(string) {}).In(0)
-var jsonType = reflect.TypeOf(func(JsonNode) {}).In(0)
 
 type Jsons interface {
 	Marshal(any) (JsonNode, error)
@@ -25,77 +20,34 @@ type JsonMapper struct {
 	unmarshallers   map[reflect.Type]*wrappedUnmarshaller
 }
 
-func typeComp(t1, t2 reflect.Type) int {
-	if t1 == t2 {
-		return 0
-	} else if t1.Kind() == reflect.Pointer {
-		if c := typeComp(t1.Elem(), t2); c == -1 {
-			return -1
-		} else {
-			return 1
-		}
-	} else if t2.Kind() == reflect.Pointer {
-		if c := typeComp(t1, t2.Elem()); c == -1 || c == 0 {
-			return -1
-		} else {
-			return 1
-		}
-	} else if str1, str2 := t1.String(), t2.String(); str1 < str2 {
-		return -1
-	} else if str1 == str2 {
-		return 0
-	} else {
-		return 1
-	}
-}
-
-func sortByKeys[T any](m map[reflect.Type]T) []T {
-
-	l := len(m)
-
-	types := make([]reflect.Type, 0, l)
-	for k := range m {
-		types = append(types, k)
-	}
-
-	sort.Slice(types, func(i, j int) bool {
-		return typeComp(types[i], types[j]) < 0
-	})
-
-	sorted := make([]T, 0, l)
-	for _, t := range types {
-		sorted = append(sorted, m[t])
-	}
-
-	return sorted
-
-}
-
-func (self *JsonMapper) JsonNode() JsonNode {
+func (self *JsonMapper) Json() JsonNode {
 
 	b := NewJsonBuilder()
 
-	b.SetEmptyObject("marshallers")
-	for _, m := range sortByKeys(self.marshallers) {
-		b.SetString(fmt.Sprintf("marshallers.%s", m.t.String()), m.String())
+	m := make([]reflect.Type, 0, len(self.marshallers))
+	for k := range self.marshallers {
+		m = append(m, k)
 	}
+	b.Set("marshallers", ReflectTypeSliceToJson(m))
 
-	b.SetEmptyObject("interface_marshallers")
-	for _, m := range self.int_marshallers {
-		b.SetString(fmt.Sprintf("interface_marshallers.%s", m.t.String()), m.String())
+	i := make([]reflect.Type, 0, len(self.int_marshallers))
+	for _, k := range self.int_marshallers {
+		i = append(i, k.t)
 	}
+	b.Set("interface_marshallers", ReflectTypeSliceToJson(i))
 
-	b.SetEmptyObject("unmarshallers")
-	for _, m := range sortByKeys(self.unmarshallers) {
-		b.SetString(fmt.Sprintf("unmarshallers.%s", m.t.String()), m.String())
+	u := make([]reflect.Type, 0, len(self.unmarshallers))
+	for k := range self.unmarshallers {
+		u = append(u, k)
 	}
+	b.Set("unmarshallers", ReflectTypeSliceToJson(u))
 
 	return b.Build()
 
 }
 
 func (self *JsonMapper) String() string {
-	return self.JsonNode().String()
+	return self.Json().String()
 }
 
 func (self *JsonMapper) insertIntWrappedMarshaller(wrapped *wrappedMarshaller) error {
@@ -198,6 +150,17 @@ func (self *JsonMapper) getMarshaller(target reflect.Type) (*wrappedMarshaller, 
 	for _, marshaller := range self.int_marshallers {
 		if target.Implements(marshaller.t) {
 			self.marshallers[target] = marshaller
+			return marshaller, nil
+		}
+	}
+
+	if target.Implements(jsonerType) {
+		marshaller := &wrappedMarshaller{}
+		self.marshallers[target] = marshaller
+		if err := newJsonerMarshaller(self, target, marshaller); err != nil {
+			delete(self.marshallers, target)
+			return nil, err
+		} else {
 			return marshaller, nil
 		}
 	}
@@ -358,12 +321,8 @@ func (self *JsonMapper) UnmarshalFromString(str string, callback any) error {
 
 func init() {
 
-	ioc.PutFactory(func() (*JsonMapper, error) {
+	ioc.PutNamedFactory("Json mapper", func() (*JsonMapper, error) {
 		return &JsonMapper{}, nil
 	}, func(Jsons) {})
-
-	ioc.Put(func(jsonMapper *JsonMapper) (JsonNode, error) {
-		return jsonMapper.JsonNode(), nil
-	}, func(JsonMarshaller) {})
 
 }

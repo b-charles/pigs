@@ -18,7 +18,28 @@ A `Parser` is a function taking a string in input and returning the parsed value
 ```go
 type Parser func(string) (T, error)
 ```
-The package use the return type to know when the parser should be use. The functions `strconv.Atoi` and `strconv.ParseBool` are already defined as `Parser`s.
+The package use the return type to know when the parser should be use.
+
+In the same spirit of [default unmarshallers in the Json package](../json), default parsers are defined in three phases:
+ * An interface is defined:
+    ```go
+    type IntParser func(string) (int, error)
+    ```
+ * A default component is defined implementing this interface:
+    ```go
+	ioc.DefaultPut(strconv.Atoi, func(IntParser) {})
+    ```
+ * A factory is defined to promote the interface implementation to the core scope:
+    ```go
+	ioc.PutFactory(func(p IntParser) (Parser, error) { return p, nil })
+    ```
+So, to overwrite a default implementation, you have to register a component implementing the specific interface in the core or test scope. The default parsers are:
+| type | interface | comment |
+| --- | --- | --- |
+| `string` | `StringParser` | identity function |
+| `float64` | `Float64Parser` | based on `strconv.ParseFloat(string, 64)` |
+| `int` | `IntParser` | based on `strconv.Atoi` |
+| `bool` | `BoolParser` | based on `strconv.ParseBool` |
 
 ### Inspectors
 

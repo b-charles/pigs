@@ -39,14 +39,11 @@ func (self *levelConfigurerImpl) GetLevel(name string) Level {
 
 }
 
-func (self *levelConfigurerImpl) String() string {
-	return "LevelConfigurer"
-}
-
 func init() {
 
-	ioc.DefaultPutFactory(func(config smartconfig.NavConfig) (*levelConfigurerImpl, error) {
-		return &levelConfigurerImpl{config}, nil
-	}, func(LevelConfigurer) {})
+	ioc.DefaultPutNamedFactory("Log level configurer",
+		func(config smartconfig.NavConfig) (*levelConfigurerImpl, error) {
+			return &levelConfigurerImpl{config}, nil
+		}, func(LevelConfigurer) {})
 
 }

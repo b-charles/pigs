@@ -112,16 +112,13 @@ func (self *JsonFilesConfigSource) LoadEnv(config MutableConfig) error {
 
 }
 
-func (self *JsonFilesConfigSource) String() string {
-	return "Json files"
-}
-
 func init() {
 
 	Set(CONFIG_SOURCE_JSON_PREFIX, "application.json")
 
-	ioc.PutFactory(func(fs afero.Fs) (*JsonFilesConfigSource, error) {
-		return &JsonFilesConfigSource{fs}, nil
-	}, func(ConfigSource) {})
+	ioc.PutNamedFactory("Json config source",
+		func(fs afero.Fs) (*JsonFilesConfigSource, error) {
+			return &JsonFilesConfigSource{fs}, nil
+		}, func(ConfigSource) {})
 
 }

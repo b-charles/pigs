@@ -1,7 +1,6 @@
 package json
 
 import (
-	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -68,24 +67,29 @@ func (self JsonString) IsNull() bool {
 	return false
 }
 
+func (self JsonString) Append(b []byte) []byte {
+	return appendString(b, string(self))
+}
+
 func (self JsonString) String() string {
-	return formatString(string(self))
+	b := make([]byte, 0, len(string(self))+2)
+	b = self.Append(b)
+	return string(b)
 }
 
 var hex = `0123456789abcdef`
 
-var escaped = map[byte]string{
-	'\b': `\b`,
-	'\f': `\f`,
-	'\n': `\n`,
-	'\r': `\r`,
-	'\t': `\t`,
+var escaped = map[byte][]byte{
+	'\b': []byte(`\b`),
+	'\f': []byte(`\f`),
+	'\n': []byte(`\n`),
+	'\r': []byte(`\r`),
+	'\t': []byte(`\t`),
 }
 
-func formatString(s string) string {
+func appendString(buf []byte, s string) []byte {
 
-	var builder strings.Builder
-	builder.WriteByte('"')
+	buf = append(buf, '"')
 
 	for i := 0; i < len(s); {
 
@@ -93,15 +97,15 @@ func formatString(s string) string {
 
 		if 0x020 <= b && b < utf8.RuneSelf {
 			if b == '\\' || b == '"' {
-				builder.WriteByte('\\')
+				buf = append(buf, '\\')
 			}
-			builder.WriteByte(b)
+			buf = append(buf, b)
 			i++
 			continue
 		}
 
 		if esc, ok := escaped[b]; ok {
-			builder.WriteString(esc)
+			buf = append(buf, esc...)
 			i++
 			continue
 		}
@@ -110,31 +114,31 @@ func formatString(s string) string {
 
 		if c == utf8.RuneError && size == 1 {
 
-			builder.WriteString(`\ufffd`)
+			buf = append(buf, []byte("\\ufffd")...)
 
 		} else if size < 4 {
 
-			builder.WriteString(`\u`)
-			builder.WriteByte(hex[(c>>12)&0xF])
-			builder.WriteByte(hex[(c>>8)&0xF])
-			builder.WriteByte(hex[(c>>4)&0xF])
-			builder.WriteByte(hex[c&0xF])
+			buf = append(buf, []byte("\\u")...)
+			buf = append(buf, hex[(c>>12)&0xF])
+			buf = append(buf, hex[(c>>8)&0xF])
+			buf = append(buf, hex[(c>>4)&0xF])
+			buf = append(buf, hex[c&0xF])
 
 		} else {
 
 			c1, c2 := utf16.EncodeRune(c)
 
-			builder.WriteString(`\u`)
-			builder.WriteByte(hex[(c1>>12)&0xF])
-			builder.WriteByte(hex[(c1>>8)&0xF])
-			builder.WriteByte(hex[(c1>>4)&0xF])
-			builder.WriteByte(hex[c1&0xF])
+			buf = append(buf, []byte("\\u")...)
+			buf = append(buf, hex[(c1>>12)&0xF])
+			buf = append(buf, hex[(c1>>8)&0xF])
+			buf = append(buf, hex[(c1>>4)&0xF])
+			buf = append(buf, hex[c1&0xF])
 
-			builder.WriteString(`\u`)
-			builder.WriteByte(hex[(c2>>12)&0xF])
-			builder.WriteByte(hex[(c2>>8)&0xF])
-			builder.WriteByte(hex[(c2>>4)&0xF])
-			builder.WriteByte(hex[c2&0xF])
+			buf = append(buf, []byte("\\u")...)
+			buf = append(buf, hex[(c2>>12)&0xF])
+			buf = append(buf, hex[(c2>>8)&0xF])
+			buf = append(buf, hex[(c2>>4)&0xF])
+			buf = append(buf, hex[c2&0xF])
 
 		}
 
@@ -142,7 +146,8 @@ func formatString(s string) string {
 
 	}
 
-	builder.WriteByte('"')
-	return builder.String()
+	buf = append(buf, '"')
+
+	return buf
 
 }

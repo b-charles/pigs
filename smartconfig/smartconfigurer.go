@@ -5,16 +5,12 @@ import (
 	"reflect"
 
 	"github.com/b-charles/pigs/ioc"
+	"github.com/b-charles/pigs/json"
 )
 
 type configurer struct {
-	source any
 	target reflect.Type
 	setter func(NavConfig, reflect.Value) error
-}
-
-func (self *configurer) String() string {
-	return fmt.Sprintf("%v", self.source)
 }
 
 type SmartConfigurer struct {
@@ -131,8 +127,23 @@ func (self *SmartConfigurer) findConfigurer(target reflect.Type) (*configurer, e
 
 }
 
+func (self *SmartConfigurer) Json() json.JsonNode {
+
+	types := make([]reflect.Type, 0, len(self.configurers))
+	for k := range self.configurers {
+		types = append(types, k)
+	}
+
+	return json.ReflectTypeSliceToJson(types)
+
+}
+
+func (self *SmartConfigurer) String() string {
+	return self.Json().String()
+}
+
 func init() {
-	ioc.PutFactory(newSmartConfigurer)
+	ioc.PutNamedFactory("Smart Configuration", newSmartConfigurer)
 }
 
 func createConfig(root string, configurable any) any {
@@ -161,10 +172,22 @@ func DefaultConfigure(root string, configurable any) {
 	ioc.DefaultPutFactory(createConfig(root, configurable))
 }
 
+func DefaultConfigureNamed(name string, root string, configurable any) {
+	ioc.DefaultPutNamedFactory(name, createConfig(root, configurable))
+}
+
 func Configure(root string, configurable any) {
 	ioc.PutFactory(createConfig(root, configurable))
 }
 
+func ConfigureNamed(name string, root string, configurable any) {
+	ioc.PutNamedFactory(name, createConfig(root, configurable))
+}
+
 func TestConfigure(root string, configurable any) {
 	ioc.TestPutFactory(createConfig(root, configurable))
+}
+
+func TestConfigureNamed(name string, root string, configurable any) {
+	ioc.TestPutFactory(name, createConfig(root, configurable))
 }

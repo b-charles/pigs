@@ -18,64 +18,75 @@ type ErrorUnmarshaller func(JsonNode) (error, error)
 
 func init() {
 
-	ioc.DefaultPut(func(json JsonNode) (string, error) {
-		if json.IsNull() {
-			return "", nil
-		} else if !json.IsString() {
-			return "", fmt.Errorf("Can not parse json %v as a string.", json)
-		} else {
-			return json.AsString(), nil
-		}
-	}, func(StringUnmarshaller) {})
-	ioc.PutFactory(func(u StringUnmarshaller) (JsonUnmarshaller, error) { return u, nil })
+	ioc.DefaultPutNamed("String Json unmarshaller (default)",
+		func(json JsonNode) (string, error) {
+			if json.IsNull() {
+				return "", nil
+			} else if !json.IsString() {
+				return "", fmt.Errorf("Can not parse json %v as a string.", json)
+			} else {
+				return json.AsString(), nil
+			}
+		}, func(StringUnmarshaller) {})
+	ioc.PutNamedFactory("String Json unmarshaller (promoter)",
+		func(u StringUnmarshaller) (JsonUnmarshaller, error) { return u, nil })
 
-	ioc.DefaultPut(func(json JsonNode) (float64, error) {
-		if json.IsNull() {
-			return 0, nil
-		} else if !json.IsFloat() {
-			return 0, fmt.Errorf("Can not parse json %v as a float.", json)
-		} else {
-			return json.AsFloat(), nil
-		}
-	}, func(Float64Unmarshaller) {})
-	ioc.PutFactory(func(u Float64Unmarshaller) (JsonUnmarshaller, error) { return u, nil })
+	ioc.DefaultPutNamed("Float64 Json unmarshaller (default)",
+		func(json JsonNode) (float64, error) {
+			if json.IsNull() {
+				return 0, nil
+			} else if !json.IsFloat() {
+				return 0, fmt.Errorf("Can not parse json %v as a float.", json)
+			} else {
+				return json.AsFloat(), nil
+			}
+		}, func(Float64Unmarshaller) {})
+	ioc.PutNamedFactory("Float64 Json unmarshaller (promoter)",
+		func(u Float64Unmarshaller) (JsonUnmarshaller, error) { return u, nil })
 
-	ioc.DefaultPut(func(json JsonNode) (int, error) {
-		if json.IsNull() {
-			return 0, nil
-		} else if !json.IsInt() {
-			return 0, fmt.Errorf("Can not parse json %v as an integer.", json)
-		} else {
-			return json.AsInt(), nil
-		}
-	}, func(IntUnmarshaller) {})
-	ioc.PutFactory(func(u IntUnmarshaller) (JsonUnmarshaller, error) { return u, nil })
+	ioc.DefaultPutNamed("Int Json unmarshaller (default)",
+		func(json JsonNode) (int, error) {
+			if json.IsNull() {
+				return 0, nil
+			} else if !json.IsInt() {
+				return 0, fmt.Errorf("Can not parse json %v as an integer.", json)
+			} else {
+				return json.AsInt(), nil
+			}
+		}, func(IntUnmarshaller) {})
+	ioc.PutNamedFactory("Int Json unmarshaller (promoter)",
+		func(u IntUnmarshaller) (JsonUnmarshaller, error) { return u, nil })
 
-	ioc.DefaultPut(func(json JsonNode) (bool, error) {
-		if json.IsNull() {
-			return false, nil
-		} else if !json.IsBool() {
-			return false, fmt.Errorf("Can not parse json %v as a boolean.", json)
-		} else {
-			return json.AsBool(), nil
-		}
-	}, func(BoolUnmarshaller) {})
-	ioc.PutFactory(func(u BoolUnmarshaller) (JsonUnmarshaller, error) { return u, nil })
+	ioc.DefaultPutNamed("Bool Json unmarshaller (default)",
+		func(json JsonNode) (bool, error) {
+			if json.IsNull() {
+				return false, nil
+			} else if !json.IsBool() {
+				return false, fmt.Errorf("Can not parse json %v as a boolean.", json)
+			} else {
+				return json.AsBool(), nil
+			}
+		}, func(BoolUnmarshaller) {})
+	ioc.PutNamedFactory("Bool Json unmarshaller (promoter)",
+		func(u BoolUnmarshaller) (JsonUnmarshaller, error) { return u, nil })
 
-	ioc.DefaultPut(func(json JsonNode) (error, error) {
-		if json.IsNull() {
-			return nil, nil
-		} else if !json.IsString() {
-			return nil, fmt.Errorf("Can not parse json %v as an error.", json)
-		} else {
-			return errors.New(json.AsString()), nil
-		}
-	}, func(ErrorUnmarshaller) {})
-	ioc.PutFactory(func(u ErrorUnmarshaller) (JsonUnmarshaller, error) { return u, nil })
+	ioc.DefaultPutNamed("Error Json unmarshaller (default)",
+		func(json JsonNode) (error, error) {
+			if json.IsNull() {
+				return nil, nil
+			} else if !json.IsString() {
+				return nil, fmt.Errorf("Can not parse json %v as an error.", json)
+			} else {
+				return errors.New(json.AsString()), nil
+			}
+		}, func(ErrorUnmarshaller) {})
+	ioc.PutNamedFactory("Error Json unmarshaller (promoter)",
+		func(u ErrorUnmarshaller) (JsonUnmarshaller, error) { return u, nil })
 
-	ioc.Put(func(json JsonNode) (JsonNode, error) {
-		return json, nil
-	}, func(JsonUnmarshaller) {})
+	ioc.PutNamed("JsonNode Json unmarshaller",
+		func(json JsonNode) (JsonNode, error) {
+			return json, nil
+		}, func(JsonUnmarshaller) {})
 
 }
 

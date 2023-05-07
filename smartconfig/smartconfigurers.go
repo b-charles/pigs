@@ -19,7 +19,6 @@ func newPointerConfigurer(smartConfigurer *SmartConfigurer, target reflect.Type)
 	} else {
 
 		return &configurer{
-			source: fmt.Sprintf("<internal %v configurer>", target),
 			target: target,
 			setter: func(config NavConfig, receiver reflect.Value) error {
 
@@ -84,7 +83,6 @@ func newStructConfigurer(smartConfigurer *SmartConfigurer, target reflect.Type) 
 	}
 
 	return &configurer{
-		source: fmt.Sprintf("<internal %v configurer>", target),
 		target: target,
 		setter: func(config NavConfig, receiver reflect.Value) error {
 
@@ -127,7 +125,6 @@ func newSliceConfigurer(smartConfigurer *SmartConfigurer, target reflect.Type) (
 	} else {
 
 		return &configurer{
-			source: fmt.Sprintf("<internal %v configurer>", target),
 			target: target,
 			setter: func(config NavConfig, receiver reflect.Value) error {
 
@@ -180,7 +177,6 @@ func newMapConfigurer(smartConfigurer *SmartConfigurer, target reflect.Type) (*c
 	} else {
 
 		return &configurer{
-			source: fmt.Sprintf("<internal %v configurer>", target),
 			target: target,
 			setter: func(config NavConfig, receiver reflect.Value) error {
 
