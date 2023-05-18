@@ -78,37 +78,42 @@ func ParseArgs(args []string) (map[string]string, error) {
 
 }
 
-type ArgsConfigSource struct {
+type ArgsConfigSource ConfigSource
+
+var CONFIG_SOURCE_PRIORITY_ARGS = 100
+
+type ArgsConfigSourceImpl struct {
 	source map[string]string
 }
 
-func (self *ArgsConfigSource) GetPriority() int {
+func (self *ArgsConfigSourceImpl) GetPriority() int {
 	return CONFIG_SOURCE_PRIORITY_ARGS
 }
 
-func (self *ArgsConfigSource) LoadEnv(config MutableConfig) error {
+func (self *ArgsConfigSourceImpl) LoadEnv(config MutableConfig) error {
 	for k, v := range self.source {
 		config.Set(k, v)
 	}
 	return nil
 }
 
-func (self *ArgsConfigSource) Json() json.JsonNode {
+func (self *ArgsConfigSourceImpl) Json() json.JsonNode {
 	return json.NewJsonObjectStrings(self.source)
 }
 
-func (self *ArgsConfigSource) String() string {
+func (self *ArgsConfigSourceImpl) String() string {
 	return self.Json().String()
-}
-
-func NewArgsConfigSource() (*ArgsConfigSource, error) {
-	m, err := ParseArgs(os.Args[1:])
-	return &ArgsConfigSource{m}, err
 }
 
 func init() {
 
-	ioc.PutNamedFactory("Args config source",
-		NewArgsConfigSource, func(ConfigSource) {})
+	ioc.DefaultPutNamedFactory("Args config source (default)",
+		func() (*ArgsConfigSourceImpl, error) {
+			m, err := ParseArgs(os.Args[1:])
+			return &ArgsConfigSourceImpl{m}, err
+		}, func(ArgsConfigSource) {})
+
+	ioc.PutNamedFactory("Args config source (promoter)",
+		func(v ArgsConfigSource) (ConfigSource, error) { return v, nil })
 
 }

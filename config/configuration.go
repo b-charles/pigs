@@ -276,6 +276,6 @@ func CreateConfiguration(sources []ConfigSource) (Configuration, error) {
 
 func init() {
 
-	ioc.PutNamedFactory("Configuration", CreateConfiguration)
+	ioc.DefaultPutNamedFactory("Configuration", CreateConfiguration)
 
 }

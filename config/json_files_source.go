@@ -69,17 +69,22 @@ func mergeIn(config MutableConfig, path string, json json.JsonNode) {
 
 }
 
-var CONFIG_SOURCE_JSON_PREFIX = "config.json"
+type JsonFilesConfigSource ConfigSource
 
-type JsonFilesConfigSource struct {
+var (
+	CONFIG_SOURCE_PRIORITY_JSON_FILES = 200
+	CONFIG_SOURCE_JSON_PREFIX         = "config.json"
+)
+
+type JsonFilesConfigSourceImpl struct {
 	fs afero.Fs
 }
 
-func (self *JsonFilesConfigSource) GetPriority() int {
+func (self *JsonFilesConfigSourceImpl) GetPriority() int {
 	return CONFIG_SOURCE_PRIORITY_JSON_FILES
 }
 
-func (self *JsonFilesConfigSource) LoadEnv(config MutableConfig) error {
+func (self *JsonFilesConfigSourceImpl) LoadEnv(config MutableConfig) error {
 
 	keys := []string{}
 	for _, key := range config.Keys() {
@@ -116,9 +121,12 @@ func init() {
 
 	Set(CONFIG_SOURCE_JSON_PREFIX, "application.json")
 
-	ioc.PutNamedFactory("Json config source",
-		func(fs afero.Fs) (*JsonFilesConfigSource, error) {
-			return &JsonFilesConfigSource{fs}, nil
-		}, func(ConfigSource) {})
+	ioc.DefaultPutNamedFactory("Json config source (default)",
+		func(fs afero.Fs) (*JsonFilesConfigSourceImpl, error) {
+			return &JsonFilesConfigSourceImpl{fs}, nil
+		}, func(JsonFilesConfigSource) {})
+
+	ioc.PutNamedFactory("Json config source (promoter)",
+		func(v JsonFilesConfigSource) (ConfigSource, error) { return v, nil })
 
 }

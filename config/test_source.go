@@ -18,18 +18,15 @@ type TestSourceEntry struct {
 	priority int
 }
 
-func Test(key, value string) {
-	ioc.TestPut(&TestSourceEntry{
-		values:   map[string]string{key: value},
-		priority: int(testPriority.Add(1)),
-	}, func(ConfigSource) {})
-}
-
 func TestMap(values map[string]string) {
 	ioc.TestPut(&TestSourceEntry{
 		values:   values,
 		priority: int(testPriority.Add(1)),
 	}, func(ConfigSource) {})
+}
+
+func Test(key, value string) {
+	TestMap(map[string]string{key: value})
 }
 
 func (self *TestSourceEntry) GetPriority() int {

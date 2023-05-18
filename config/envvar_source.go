@@ -14,7 +14,7 @@ func convertEnvVarKey(key string) string {
 
 func ParseEnvVar(envvar []string) map[string]string {
 
-	env := make(map[string]string)
+	env := make(map[string]string, len(envvar))
 
 	for _, e := range envvar {
 		pair := strings.Split(e, "=")
@@ -25,33 +25,40 @@ func ParseEnvVar(envvar []string) map[string]string {
 
 }
 
-type EnvVarConfigSource struct {
+type EnvVarConfigSource ConfigSource
+
+var CONFIG_SOURCE_PRIORITY_ENV_VAR = 0
+
+type EnvVarConfigSourceImpl struct {
 	source map[string]string
 }
 
-func (self *EnvVarConfigSource) GetPriority() int {
+func (self *EnvVarConfigSourceImpl) GetPriority() int {
 	return CONFIG_SOURCE_PRIORITY_ENV_VAR
 }
 
-func (self *EnvVarConfigSource) LoadEnv(config MutableConfig) error {
+func (self *EnvVarConfigSourceImpl) LoadEnv(config MutableConfig) error {
 	for k, v := range self.source {
 		config.Set(k, v)
 	}
 	return nil
 }
 
-func (self *EnvVarConfigSource) Json() json.JsonNode {
+func (self *EnvVarConfigSourceImpl) Json() json.JsonNode {
 	return json.NewJsonObjectStrings(self.source)
 }
 
-func (self *EnvVarConfigSource) String() string {
+func (self *EnvVarConfigSourceImpl) String() string {
 	return self.Json().String()
 }
 
 func init() {
 
-	ioc.PutNamed("Env var config source",
-		&EnvVarConfigSource{ParseEnvVar(os.Environ())},
-		func(ConfigSource) {})
+	ioc.DefaultPutNamed("Env var config source (default)",
+		&EnvVarConfigSourceImpl{ParseEnvVar(os.Environ())},
+		func(EnvVarConfigSource) {})
+
+	ioc.PutNamedFactory("Env var config source (promoter)",
+		func(v EnvVarConfigSource) (ConfigSource, error) { return v, nil })
 
 }
