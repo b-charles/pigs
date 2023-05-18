@@ -67,17 +67,36 @@ func ParseLevel(value string) (Level, error) {
 	}
 }
 
+type LevelMarshaller func(Level) (json.JsonNode, error)
+type LevelUnmarshaller func(json.JsonNode) (Level, error)
+type LevelParser func(string) (Level, error)
+
 func init() {
 
-	ioc.PutNamed("Log level Json marshaller",
+	ioc.DefaultPutNamed("Log level Json marshaller (default)",
 		func(level Level) (json.JsonNode, error) {
 			return level.Json(), nil
-		}, func(json.JsonMarshaller) {})
-	ioc.PutNamed("Log level Json unmarshaller",
-		func(node json.JsonNode) (Level, error) {
-			return ParseLevel(node.AsString())
-		}, func(json.JsonUnmarshaller) {})
+		}, func(LevelMarshaller) {})
 
-	ioc.PutNamed("Log level parser", ParseLevel, func(smartconfig.Parser) {})
+	ioc.PutNamedFactory("Log level Json marshaller (promoter)",
+		func(m LevelMarshaller) (json.JsonMarshaller, error) { return m, nil })
+
+	ioc.DefaultPutNamed("Log level Json unmarshaller (default)",
+		func(node json.JsonNode) (Level, error) {
+			if node.IsString() {
+				return ParseLevel(node.AsString())
+			} else {
+				return Info, fmt.Errorf("Can not parse json %v as a log level.", node)
+			}
+		}, func(LevelUnmarshaller) {})
+
+	ioc.PutNamedFactory("Log level Json unmarshaller (promoter)",
+		func(u LevelUnmarshaller) (json.JsonUnmarshaller, error) { return u, nil })
+
+	ioc.DefaultPutNamed("Log level parser (default)",
+		ParseLevel, func(LevelParser) {})
+
+	ioc.PutNamedFactory("Log level parser (promoter)",
+		func(p LevelParser) (smartconfig.Parser, error) { return p, nil })
 
 }
