@@ -176,7 +176,7 @@ func (self *loggerImpl) AddContextualizer(contextualizer Contextualizer) Logger 
 }
 
 func (self *loggerImpl) AddContext(key string, value any) Logger {
-	return self.AddContextualizer(newStaticContextualizer(key, value))
+	return self.AddContextualizer(NewStaticContextualizer(key, value))
 }
 
 var DEFAULT_LOGGER_NAME = "root"

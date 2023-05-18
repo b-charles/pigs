@@ -43,11 +43,11 @@ func (self StaticContextualizer) AddContext(logger Logger, level Level, builder 
 	}
 }
 
-func newStaticContextualizer(key string, value any) StaticContextualizer {
+func NewStaticContextualizer(key string, value any) StaticContextualizer {
 	return map[string]any{key: value}
 }
 
-func newStaticContextualizerMap(m map[string]any) StaticContextualizer {
+func NewStaticContextualizerMap(m map[string]any) StaticContextualizer {
 	r := make(map[string]any, len(m))
 	for k, v := range m {
 		r[k] = v
