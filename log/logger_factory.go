@@ -1,6 +1,8 @@
 package log
 
 import (
+	"sort"
+
 	"github.com/b-charles/pigs/ioc"
 	"github.com/b-charles/pigs/json"
 )
@@ -34,7 +36,13 @@ func init() {
 			levelConfigurer LevelConfigurer,
 			contextualizers []Contextualizer,
 			appenders []Appender) (*loggerFactoryImpl, error) {
+
+			sort.Slice(contextualizers, func(i, j int) bool {
+				return contextualizers[i].GetPriority() < contextualizers[j].GetPriority()
+			})
+
 			return &loggerFactoryImpl{jsons, levelConfigurer, contextualizers, appenders}, nil
+
 		}, func(LoggerFactory) {})
 
 }

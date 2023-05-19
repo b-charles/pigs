@@ -2,6 +2,7 @@ package log
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/b-charles/pigs/config"
 	"github.com/b-charles/pigs/ioc"
@@ -166,17 +167,37 @@ func (self *loggerImpl) FatalLog(path string, value any) {
 }
 
 func (self *loggerImpl) AddContextualizer(contextualizer Contextualizer) Logger {
+
+	newContextualizers := make([]Contextualizer, len(self.contextualizers), len(self.contextualizers)+1)
+	copy(newContextualizers, self.contextualizers)
+	newContextualizers = append(newContextualizers, contextualizer)
+	sort.Slice(newContextualizers, func(i, j int) bool {
+		return newContextualizers[i].GetPriority() < newContextualizers[j].GetPriority()
+	})
+
 	return &loggerImpl{
 		jsons:           self.jsons,
 		name:            self.name,
 		level:           self.level,
-		contextualizers: append(self.contextualizers, contextualizer),
+		contextualizers: newContextualizers,
 		appenders:       self.appenders,
 	}
+
+}
+
+func (self *loggerImpl) AddPriorityContext(priority int, key string, value any) Logger {
+	return self.AddContextualizer(NewStaticContextualizer(priority, key, value))
 }
 
 func (self *loggerImpl) AddContext(key string, value any) Logger {
-	return self.AddContextualizer(NewStaticContextualizer(key, value))
+
+	prio := 0
+	if length := len(self.contextualizers); length > 0 {
+		prio = self.contextualizers[length-1].GetPriority() + 1
+	}
+
+	return self.AddContextualizer(NewStaticContextualizer(prio, key, value))
+
 }
 
 var DEFAULT_LOGGER_NAME = "root"
