@@ -18,28 +18,15 @@ A `Parser` is a function taking a string in input and returning the parsed value
 ```go
 type Parser func(string) (T, error)
 ```
-The package use the return type to know when the parser should be use.
+The package use the return type to know when the parser should be used.
 
-In the same spirit of [default unmarshallers in the Json package](../json), default parsers are defined in three phases:
- * An interface is defined:
-    ```go
-    type IntParser func(string) (int, error)
-    ```
- * A default component is defined implementing this interface:
-    ```go
-	ioc.DefaultPut(strconv.Atoi, func(IntParser) {})
-    ```
- * A factory is defined to promote the interface implementation to the core scope:
-    ```go
-	ioc.PutFactory(func(p IntParser) (Parser, error) { return p, nil })
-    ```
-So, to overwrite a default implementation, you have to register a component implementing the specific interface in the core or test scope. The default parsers are:
-| type | interface | comment |
+Default parsers are defined following the [3 steps tricks to register overloadable components](../ioc/README.md#overloadable-components-in-auto-discovery-injection). So, to overwrite a default implementation, you have to register a component implementing the specific interface in the core or test scope. The default parsers are:
+| type | signature | comment |
 | --- | --- | --- |
-| `string` | `StringParser` | identity function |
-| `float64` | `Float64Parser` | based on `strconv.ParseFloat(string, 64)` |
-| `int` | `IntParser` | based on `strconv.Atoi` |
-| `bool` | `BoolParser` | based on `strconv.ParseBool` |
+| `string` | `type StringParser func(string) (string, error)` | identity function |
+| `float64` | `type Float64Parser func(string) (float64, error)` | based on `strconv.ParseFloat(string, 64)` |
+| `int` | `type IntParser func(string) (int, error)` | based on `strconv.Atoi` |
+| `bool` | `type BoolParser func(string) (bool, error)` | based on `strconv.ParseBool` |
 
 ### Inspectors
 
@@ -65,7 +52,7 @@ The root node corresponds to the key `""` (empty string). The method `Get` diffe
 
 #### Struct
 
-The package handle structs and pointers to struct. Of course, the input of the method `Configure` should be a pointer so it has to be settable, and each field name should starts with an upper case for the same reason. Each field can be annoted with the tag `config` wich can defined the key to use (relative or absolute, see [the `Get` method of `NavConfig`](#inspectors)). If no tag are found, the field name in lowercase is used as a relative sub key. The configurer search for each field which parser or configurer has to be used and can be called recursively.
+The package handle structs and pointers to struct. Of course, the input of the method `Configure` should be a pointer so it has to be settable, and each field name should starts with an upper case for the same reason. Each field can be annotated with the tag `config` which can defined the key to use (relative or absolute, see [the `Get` method of `NavConfig`](#inspectors)). If no tag are found, the field name in lowercase is used as a relative sub key. The configurer search for each field which parser or configurer has to be used and can be called recursively.
 
 #### Slices
 
@@ -82,7 +69,7 @@ The `Configure` function take two inputs:
 func Configure(root string, configurable any)
 ```
 
- * A `root` path: for each configured field, the corresponding configuration key will be prefixed by this root path (except if the field is annoted with the tag `config` and the value of the tag starts with an `.`). This root path can be `""` (empty string).
+ * A `root` path: for each configured field, the corresponding configuration key will be prefixed by this root path (except if the field is annotated with the tag `config` and the value of the tag starts with an `.`). This root path can be `""` (empty string).
  * A pointer to a struct, which will be setted by the special configurer for struct. The function will register it as an ioc component.
 
 Two other functions, `DefaultConfigure` and `TestConfigure` are also defined to register the configuration struct in the default scope and in test scope of the ioc framework.

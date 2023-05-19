@@ -18,7 +18,7 @@ This framework has been written with some goals in mind:
  * Auto-discovery, also known as voodoo origins.
 
 And some goals are deliberated ignored:
- * No notion of extendable scope: it's classical for IOC frameworks to include the notion of scope, which defines visibility and lifecycle of components (singleton, prototype...). But not here. The framework defines a notion of scopes for a different goal (component definition precedence) and the user can not extend the pre-defined scopes.
+ * No notion of extendable scope: it's classical for IOC frameworks to include the notion of scope, which defines visibility and life cycle of components (singleton, prototype...). But not here. The framework defines a notion of scopes for a different goal (component definition precedence) and the user can not extend the pre-defined scopes.
  * No integration with any web framework, but web framework can be nicely integrated in it.
  * No AOP support: voodoo is ok, but not satanism.
 
@@ -30,10 +30,12 @@ A component is something: a struct, a pointer, a map, a chan, an integer... It's
  * an optional name: the name doesn't play any role in the injection process but can be defined for debugging purposes.
  * its value or its factory: you can directly define the component value or produce a function which will create the component value. That kind of function is called a factory.
  * its main type, computed by reflection on the given value or the factory.
- * and optionally some _signature_ interfaces which are some additional interfaces implemented by the component[^duck]. Multiple components can share the same main type and signatures to enable auto-discovery, but that concept can be confusing and error-prone: it can be considered good practice to register each component with a specific and unique main type, and using signatures only when auto-discovery is needed.
+ * and optionally some _signature_ interfaces which are some additional interfaces implemented by the component[^duck].
+
+Multiple components can share the same main type and signatures to enable auto-discovery, but that concept can be confusing and error-prone: it can be considered good practice to register each component with a specific and unique main type, and using signatures only when auto-discovery is needed.
 Any component with a value `nil` will be silently discarded and never be injected in another component. This behaviour, together with auto-discovery and scopes features, helps implement conditional component creation.
 
-A container is a set of components: it manages the lifecycle of each component and take in charge the injection process. The framework defines one instance of this container and redirect all API calls to that container. The container defines by itself two special components of type `ioc.ContainerStatus` and `ioc.ContainerInfo` (see [Special components](#special-components)), and the framework defines also some components for classical integration (see [Default integration](#default-integration)).
+A container is a set of components: it manages the life cycle of each component and take in charge the injection process. The framework defines one instance of this container and redirect all API calls to that container. The container defines by itself two special components of type `ioc.ContainerStatus` and `ioc.ContainerInfo` (see [Special components](#special-components)), and the framework defines also some components for classical integration (see [Default integration](#default-integration)).
 
 [^duck]: The concept of signature is not very in line with the spirit of the duck typing of Go, but it's a need for performance (what should be injected, without checking each component) and flexibility (what should *not* be injected, even if the interface matches the implementation).
 
@@ -84,16 +86,65 @@ Here, if `injected` is injected by the container, the field `AllComponents` will
 Like it's said in the main goals of the framework, there is no concept of scope, or at least not extendable scope. In fact, the container is divided in three set of components: one for the default components, one for the core components, and one for tests. Every time an injection is proceeded, the container start by searching any component in the test set. If nothing is found or if the components are `nil`, the container use the core set. If still nothing is found (or only `nil` components), then the container use the default set. In case of auto-discovery injection (slice), if at least one matching component is found in the test set, that components are injected and the components in the core set are not used (which also means if you have configured some components to be auto-discovered in the default or core scope, you can not run a test with the auto-discovered slice empty), and in the same spirit, if the core set is used and at least one component is found, the default set is ignored.
 
 The API is defined to record a component in the default set, the core set or in the test set. With that mechanisms, it's easy to:
- * write some libraries with default fonctionnalities which can be overloaded by the main application,
+ * write some libraries with default functionalities which can be overloaded by the main application,
  * define clean unit test that mock some components and limit each test to a part of the application (not the entire application, but not only one component neither).
 
-Last little trick: you can promote a component to a "superior" scope (a default component to a core or a test component, or a core component as a test component). If during the instanciation of a test component by a factory (a function which returns the component value), a component of the same type produced by the factory is required, the container doesn't throw a cyclic dependency error (as it should) but search if a core or a default component can be used. In the same way, if a core component factory requires a component of the same type, the container search if a default component can be used. This mechanism can be usefull to define quickly one composant which will be injected in a slice by auto-discovery, or to configure a component for a test environment.
+You can also promote a component to a "superior" scope (a default component to a core or a test component, or a core component as a test component). If during the instantiation of a test component by a factory (a function which returns the component value), a component of the same type produced by the factory is required, the container doesn't throw a cyclic dependency error (as it should) but search if a core or a default component can be used. In the same way, if a core component factory requires a component of the same type, the container search if a default component can be used. This mechanism can be useful to define quickly one component which will be injected in a slice by auto-discovery (even if another more convenient strategy is possible, see the next section), or to configure a component for a test environment.
 
-### Container and components lifecycles
+#### Overloadable components in auto-discovery injection
+
+This section is about an advanced trick used in several place in Pigs libraries and required that you understand the ioc API explained in the next sections. If you read this documentation for the first time, you can skip this part and come back latter.
+
+Sometimes, a problem occurs: how to define a default overloadable component, but in the same time make it available to auto-discovery with other core registered components?
+
+For example, let's take a library which defines a `Burger` component which gathers all components implementing an `Ingredient` interface:
+```go
+type Ingredient interface {
+    ...
+}
+
+type Burger struct {
+    Ingredients []Ingredient `inject:""`
+}
+
+func init() {
+    ioc.Put(&Burger{})
+}
+```
+The library was developed to be extensible and must accept `Ingredient` components defined anywhere in the code, to allow some applications to demonstrate gastronomic creativity. The library also proposes a `type Bun struct {...}` which implements `Ingredient`. That `Bun` is interesting enough to be registered as a component, but it should exists an option to overload it: some people may want use bagels instead.
+
+A possible strategy is to only define default implementations without ioc integration, and let the application's main code register the chosen ingredients as core components. The library can also register that default implementations as default components, but if a component is registered in the core scope, the wanted default components have still to be promoted in core scope individually.
+
+A better approach consists of this three steps:
+ * An additional specific interface is defined for this default implementation. This interface should at least be assignable to the injected interface, and can be simply defined as a type copy:
+   ```go
+   type Bread Ingredient
+   ```
+ * The default implementation is recorded in the default scope, with a signature set to the specific interface (not the injected):
+   ```go
+   func init() {
+      ioc.DefaultPut(&Bum{}, func(Bread){})
+   }
+   ```
+ * A factory is defined to promote any component implementing the specific interface to a core component of the injected type:
+   ```go
+   func init() {
+      ioc.PutFactory(func(bread Bread) Ingredient { return bread })
+   }
+   ```
+
+By default, the `Bum` component which implements `Bread` will be promoted as an core `Ingredient` by the factory, and will be injected in the `Burger` with other core `Ingredient` components. But it can also be discarded and overloaded by simply register a component in the core or test scope with the `Bread` signature:
+```go
+func init() {
+  ioc.Put(&Bagel{}, func(Bread){})
+}
+```
+
+### Container and components life cycles
 
 At least. After all these theoretical concepts, we will finally see the concrete part of the framework.
 
-The lifecycle of the container is going through several steps:
+The life cycle of the container is going through several steps:
  * definition,
  * exploitation:
    * for each necessary component:
@@ -110,7 +161,7 @@ Let's see each steps in details.
 
 To be able to use a component, you should start by recording it, or by defining how it will be created. That's the definition step.
 
-You can call the function `ioc.Put` to record directly the component:
+You can call the function `ioc.Put(component any, signatures ...any)` to record directly the component:
 ```go
 type DemoComponent struct { ... }
 
@@ -126,9 +177,9 @@ func init() {
     ioc.Put(&DemoComponent{}, func(FirstInterface, SecondInterface) {})
 }
 ```
-When a component is registered with signatures, the framework checks that the component can be casted to each signature type and panics if this is not the case.
+When a component is registered with signatures, the framework checks that the component can be casted to each signature type and panics if it is not the case.
 
-You can also give a name or a label to the component, using the function `ioc.PutNamed`:
+You can also give a name or a label to the component, using the function `ioc.PutNamed(name string, component any, signatures ...any)`:
 ```go
 type DemoComponent struct { ... }
 
@@ -138,7 +189,7 @@ func init() {
 ```
 The name is only for debugging, can be any string, and doesn't modify the behaviour of the container regarding the component.
 
-Instead of `ioc.Put` and `ioc.PutNamed`, you can also use `ioc.PutFactory` and `ioc.PutNamedFactory` to define a factory, a function which will create the component:
+Instead of `ioc.Put` and `ioc.PutNamed`, you can also use `ioc.PutFactory(factory any, signatures ...any)` and `ioc.PutNamedFactory(name string, factory any, signatures ...any)` to define a factory, a function which will create the component:
 ```go
 package mypkg
 
@@ -170,15 +221,15 @@ func init() {
 }
 ```
 
-Factories can not define cyclic dependencies (i.e. a factory produces a component `A` which is needed to another factory to create a component `B` which should be injected in the factory of `A`). To resolve the problem, you have to break the cycle, or wait another step in the component's lifecycle (like [Injection](#injection) or [Post-Initialization](#post-initialization)) to inject the required component.
+Factories can not define cyclic dependencies (i.e. a factory produces a component `A` which is needed to another factory to create a component `B` which should be injected in the factory of `A`). To resolve the problem, you have to break the cycle, or wait another step in the component's life cycle (like [Injection](#injection) or [Post-Initialization](#post-initialization)) to inject the required component.
 
-Like explain in the section [Scopes: Default, Core and Testing](#scopes-default-core-and-testing), the functions `Put`, `PutNamed`, `PutFactory` and `PutNamedFactory` define the component in the core set. The functions `DefaultPut`, `DefaultPutNamed`, `DefaultPutFactory` and `DefaultPutNamedFactory` can be used in the same way to define a component in the default set, and the functions `TestPut`, `TestPutNamed`, `TestPutFactory` and `TestPutNamedFactory` for the test set.
+Like explained in the section [Scopes: Default, Core and Testing](#scopes-default-core-and-testing), the functions `Put`, `PutNamed`, `PutFactory` and `PutNamedFactory` define the component in the core set. The functions `DefaultPut`, `DefaultPutNamed`, `DefaultPutFactory` and `DefaultPutNamedFactory` can be used in the same way to define a component in the default set, and the functions `TestPut`, `TestPutNamed`, `TestPutFactory` and `TestPutNamedFactory` for the test set.
 
-Finaly, all this methods have their `Erroneous*` prefixed version (e.g. `ErroneousTestPutNamed`) which doesn't panic but returns an error if something wrong happened.
+Finally, all this methods have their `Erroneous*` prefixed version (e.g. `ErroneousTestPutNamed(name string, component any, signatures ...any) error`) which doesn't panic but returns an error if something wrong happened.
 
 ### Exploitation
 
-Only defining components doesn't create anything. You have to specify what are the main components, the components you need to instantiate and get to starting your application (or doing some tests). The container will instantiate these components, and also their dependencies. The API defines the function `CallInjected` that can be used to retrieve that main components from the container.
+Only defining components doesn't create anything. You have to specify what are the main components, the components you need to instantiate and get to starting your application (or doing some tests). The container will instantiate these components, and also their dependencies. The API defines the function `CallInjected(injected any)` that can be used to retrieve that main components from the container.
 ```go
 package mypkg
 
@@ -198,7 +249,7 @@ func main() {
 
 }
 ```
-As you should have guessed, the function `CallInjected` take as sole argument a function that will be injected (see [Injection of functions](#injection-of-functions)). The given function can return nothing or an error. The method `CallInjected` panics if an error occurs, but you can also use `ErroneousCallInjected` which instead returns an error if something had happened.
+As you should have guessed, the function `CallInjected` take as sole argument a function that will be injected (see [Injection of functions](#injection-of-functions)). The given function can return nothing or an error. The method `CallInjected` panics if an error occurs, but you can also use `ErroneousCallInjected(injected any) error` which instead returns an error if something had happened.
 
 #### Initialization
 
@@ -220,15 +271,15 @@ If the component have a method `PostInit`, the container calls it. The method is
 
 #### Run main function
 
-When each necessary components are fully initialized, the framework call the given function of `CallInjected`. That's what we wanted from the start and where your business begins. Be careful if you are working with multi-threads: the end of this function will trigger the next phase of the container and so the closing of components.
+When each necessary components are fully initialized, the framework call the given function of `CallInjected` (or `ErroneousCallInjected`). That's what we wanted from the start and where your business begins. Be careful if you are working with multi-threads (goroutines): the end of this function will trigger the next phase of the container and so the closing of components.
 
 #### Close
 
-After the main function executed, the container will close automatically every component implementing the interface `io.Closer`. If a component panics or returns a non-null error at the call of its method `Close`, the error is silently discarded. The `Close` methods are called in the reverse order of component instantiation (main components first, components without dependencies last).
+After the main function executed, the container will close automatically every component implementing the interface `io.Closer`. If a component panics or returns a non-null error at the call of its method `Close() error`, the error is silently discarded. The `Close` methods are called in the reverse order of component instantiation (main components first, components without dependencies last).
 
 ### Redefinition
 
-It should be only one call of `CallInjected` during the run of the application or at each unit test: after a call of `CallInjected`, every instances are released along the component definitions (default and core) if no test components are found. Otherwise, if at least one component is defined in the test scope (even if it is not instanciated or injected in another component), instances of all scopes and component definitions of test scope only are released.
+It should be only one call of `CallInjected` during the run of the application or at each unit test: after a call of `CallInjected`, every instances are released along the component definitions (default and core) if no test components are found. Otherwise, if at least one component is defined in the test scope (even if it is not instantiated or injected in another component), instances of all scopes and component definitions of test scope only are released.
 
 So, if you are running unit tests, you have to defined some fixture to redefined each time all the test components you want to use, and for each test, every component is re-instanced. Be sure to define at least one component in the test scope, even if it is not used, before each call of `CallInjected` or you will loosing the definitions of all the core components.
 
@@ -252,7 +303,7 @@ type Doer interface {
   do()
 }
 
-// Yeller
+// Yeller, implementing Doer
 
 type Yeller struct {}
 
@@ -264,7 +315,7 @@ func init() {
   ioc.Put(&Yeller{}, func(Doer){})
 }
 
-// TenTimer
+// TenTimer, repeating 10 times a Doer
 
 type TenTimer struct {
   Doer Doer `inject:""`
@@ -282,7 +333,7 @@ func init() {
 
 func main() {
   ioc.CallInjected(func(t *TenTimer) {
-    t.doTenTimes()
+    t.doTenTimes() // expect displaying `I'm doing!` ten times
   })
 }
 ```
@@ -305,6 +356,8 @@ func TestIoc(t *testing.T) {
   RunSpecs(t, "App test suite")
 }
 
+// Mock, test component implementing Doer
+
 type Mock struct {
   Called int
 }
@@ -318,6 +371,7 @@ var _ = Describe("App tests", func() {
   var mock *Mock
 
   BeforeEach(func() {
+    // Register a Mock instance in test scope as a Doer
     mock = &Mock{}
     ioc.TestPut(mock, func(Doer){})
   }
@@ -341,15 +395,15 @@ var _ = Describe("App tests", func() {
 
 A special component of type `ioc.ContainerStatus` is defined by the container itself and can be used to analyse and display the internal status of the container. The usage of this component should be limited to a temporary debugging, since injecting this component will maintain a reference to all other components and instances, preventing the garbage collector to release anything recorded in the container.
 
-The `String` and `Print` methods produce gorgious outputs which should be easy enough to understand without a detailed documentation.
+The `String() string` and `Print()` methods produce gorgeous outputs which should be easy enough to understand without a detailed documentation.
 
 ### Container info
 
 A special component  of type `ioc.ContainerInfo` is also defined by the container. It can be injected to get some information about the usage of the container:
- * `TestMode()` returns `true` if the container is used in a test environment, i.e. if at least one test component is recorded.
- * `CreationTime()` returns the time of the container creation.
- * `StartingTime()` returns the time of the call of `CallInjected` function.
- * `ClosingTime()` returns the time of the end of the `CallInjected` function. The returned time is the zero value until the `CallInjected` ends, and can be used in the `Close` methods of the components.
+ * `TestMode() bool` returns `true` if the container is used in a test environment, i.e. if at least one test component is recorded.
+ * `CreationTime() time.Time` returns the time of the container creation.
+ * `StartingTime() time.Time` returns the time of the call of `CallInjected` function.
+ * `ClosingTime() time.Time` returns the time of the end of the `CallInjected` function. The returned time is the zero value until the `CallInjected` ends, and can be used in the `Close` methods of the components.
 
 Times are generated by using the standard `time` package, and ignore [the Clock integration](#clock). During tests, the container is created once, so the creation time will be constant for all tests, and the starting and closing times are updated at each unit test.
 

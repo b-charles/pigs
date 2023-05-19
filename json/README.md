@@ -2,12 +2,12 @@
 
 ## Json
 
-Json.
+[Json.](https://www.json.org)
 
 ## Goals
 
 This library has two purposes:
- * to be a Json encoding/decoding library, nice and efficient
+ * to be a Json encoding/decoding library, nice and efficient,
  * integrate some Json marshallers and unmarshallers in the [ioc](../ioc) framework.
 
 ## Json core
@@ -23,11 +23,15 @@ The Json document is abstracted behind the interface `JsonNode`. A `JsonNode` ca
  * `JsonBool` for a boolean, with two constants `JSON_TRUE` and `JSON_FALSE` for `true` and `false`.
  * `JsonNull` for `null` with one defined instance `JSON_NULL`.
 
-Each of these types is unmutable, and values can not be modified after been created. The Json serialisation can be obtained by calling the method `String`.
+Each of these types is unmutable: values can not be modified after been created. The Json serialisation can be obtained by calling the method `String() string`.
 
-To create a JsonNode, you can:
- * Use the suitable constructor (`NewJsonObject` and `NewJsonArray`), cast the value to the expecting node type (for `JsonString`, `JsonInt` or `JsonFloat`) or use the defined constants (`JSON_TRUE`, `JSON_FALSE` or `JSON_NULL`).
- * Use a defined parser: `Parse`, `ParseAll`, `ParseString` or `ParseAllString`
+To create a `JsonNode`, you can:
+ * Use the different core functions:
+    * For objects, you can use the constructor `NewJsonObjectMappedSorted[T any](members map[string]T, mapper func(v T) JsonNode, less func(a, b string) bool) *JsonObject` which is the general method to convert a map to a Json object, mapping each value of the map to a `JsonNode` with the `mapper` argument and sorting the Json object members with the `less` methods. Other more convenient constructors are also defined, like `NewJsonObjectMapped[T any](members map[string]T, mapper func(v T) JsonNode) *JsonObject` which use a default string comparator, `NewJsonObjectSorted(members map[string]JsonNode, less func(a, b string) bool)` for maps with already Json nodes values, and `NewJsonObject(members map[string]JsonNode) *JsonObject`. Two additional constructors `NewJsonObjectStringsSorted(members map[string]string, less func(a, b string) bool) *JsonObject` and `NewJsonObjectStrings(members map[string]string) *JsonObject` are defined to quickly convert a `map[string]string` to a Json object. Finally, the constant `JSON_EMPTY_OBJECT` can also be used for immutable empty object.
+    * For arrays, you can use the general constructor `NewJsonArrayMapped[T any](elements []T, mapper func(v T) JsonNode) *JsonArray` which convert each element of a slice to a `JsonNode` by using the `mapper` function. More convenient constructor are defined for classical slices: `NewJsonArray(elements []JsonNode) *JsonArray`, `NewJsonArrayStrings(elements []string) *JsonArray`, `NewJsonArrayFloats(elements []float64) *JsonArray`, `NewJsonArrayInts(elements []int) *JsonArray` and `NewJsonArrayBools(elements []bool) *JsonArray`. Finally, the constant `JSON_EMPTY_ARRAY` can also be used for immutable empty array.
+    * You can directly cast a `string` to a `JsonString`, an `int` to a `JsonInt` or a `float64` to a `JsonFloat`.
+    * Finally, for a `JsonBool`, you should use the constants `JSON_TRUE` and `JSON_FALSE`, and the only instance available for a `JsonNull` is the constant `JSON_NULL`.
+ * Use a defined parser: `Parse(source io.RuneReader) (JsonNode, error)`, `ParseAll(source io.RuneReader) ([]JsonNode, error)`, `ParseString(source string) (JsonNode, error)` or `ParseAllString(source string) ([]JsonNode, error)`
  * Use a builder:
     ```go
     b := NewJsonBuilder()
@@ -39,7 +43,7 @@ To create a JsonNode, you can:
     
     fmt.Print(node.String()) // expect `{"a":"hello","b":{"c.d":"world"},"e":[true,{"f":42}]}`
     ```
-   The function `EscapePath` can be useful to escape special characters (`.` and `[`) in the path.
+   The function `EscapePath(path string) string` can be useful to escape special characters (`.` and `[`) in the path.
 
 ## Json lib
 
@@ -58,34 +62,17 @@ All marshallers and unmarshallers are grouped and can be called from an interfac
  * The method `Unmarshal(json JsonNode, callback func(T)) error` convert a node to a value and call the callback function with that value. The expected type is computed by looking at the callback argument.
  * The method `UnmarshalFromString(json string, callback func(T)) error` parse the given string before calling the method `Unmarshal`.
 
-The json component will do his best to handle marshallers defined for interfaces and try to select the best matching interface to a given unkown instance. But this kind of marshallers will slow down the all process, and marshallers defined on concrete types (not interface) should be prefered. 
+The json component will do his best to handle marshallers defined for interfaces and try to select the best matching (most specific) interface to a given unkown instance. But this kind of marshallers will slow down the all process, and marshallers defined on concrete types (not interface) should be prefered. 
 
-The lib defines some marshallers and unmarshallers. In order to be able to overwrite the default implementation but in the same time includes the implementation in the core scope, the default (un)marshallers are defined in 3 steps:
- * An interface is defined, with the same signature than a dedicated marshaller but without refencing it: e.g. for string marshalling:
-    ```go
-    type StringMarshaller func(v string) (JsonNode, error)
-    ```
- * A default implementation of this interface is defined in the default scope. Again for string:
-    ```go
-	ioc.DefaultPutNamed("String Json marshaller (default)",
-		func(v string) (JsonNode, error) {
-			return JsonString(v), nil
-		}, func(StringMarshaller) {})
-    ```
- * Then, a factory is defined to promote the interface implementation as a valid (un)marshaller in the core scope:
-    ```go
-	ioc.PutNamedFactory("String Json marshaller (promoter)",
-		func(m StringMarshaller) (JsonMarshaller, error) { return m, nil })
-    ```
-So, to overwrite an implementation, you have to register a component implementing the specific interface in the core or test scope. The default implementation and associated interfaces are:
+The lib defines some marshallers and unmarshallers. In order to be able to overwrite the default implementation but in the same time includes the implementation in the core scope, the default (un)marshallers are defined following the [3 steps tricks to register overloadable components](../ioc/README.md#overloadable-components-in-auto-discovery-injection). To overwrite an implementation, you have to register a component implementing with the specific signature in the core or test scope:
 
-| type | marshaller interface | unmarshaller interface |
+| type | marshaller signature | unmarshaller signature |
 | --- | --- | --- |
-| `string` | `StringMarshaller` | `StringUnmarshaller` |
-| `float64` | `Float64Marshaller` | `Float64Unmarshaller` |
-| `int` | `IntMarshaller` | `IntUnmarshaller` |
-| `bool` | `BoolMarshaller` | `BoolUnmarshaller` |
-| `error` | `ErrorMarshaller` | `ErrorUnmarshaller` |
+| `string` | `type StringMarshaller func(string) (JsonNode, error)` | `type StringUnmarshaller func(JsonNode) (string, error)` |
+| `float64` | `type Float64Marshaller func(float64) (JsonNode, error)` | `type Float64Unmarshaller func(JsonNode) (float64, error)` |
+| `int` | `type IntMarshaller func(int) (JsonNode, error)` | `type IntUnmarshaller func(JsonNode) (int, error)` |
+| `bool` | `type BoolMarshaller func(bool) (JsonNode, error)` | `type BoolUnmarshaller func(JsonNode) (bool, error)` |
+| `error` | `type ErrorMarshaller func(v error) (JsonNode, error)` | `type ErrorUnmarshaller func(JsonNode) (error, error)` |
 
 The marshaller and unmarshaller defined for `error` are very basic, only rely on the `Error() string` method and simply use a string node to represents the error (no supports for wrapped errors, nor joined errors).
 
