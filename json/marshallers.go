@@ -3,6 +3,7 @@ package json
 import (
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/b-charles/pigs/ioc"
 )
@@ -101,146 +102,219 @@ type Jsoner interface {
 	Json() JsonNode
 }
 
-func newJsonerMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller *wrappedMarshaller) error {
+func newJsonerMarshaller(target reflect.Type) (*wrappedMarshaller, error) {
 
 	if !target.Implements(jsonerType) {
-		return fmt.Errorf("The target %v doesn't implements the Jsoner interface.", target)
+		return nil, fmt.Errorf("The target %v doesn't implements the Jsoner interface.", target)
 	}
 
-	valueMarshaller.f = func(v reflect.Value) (JsonNode, error) {
-		return v.Interface().(Jsoner).Json(), nil
-	}
-
-	return nil
+	return &wrappedMarshaller{
+		t: target,
+		f: func(v reflect.Value) (JsonNode, error) {
+			return v.Interface().(Jsoner).Json(), nil
+		},
+	}, nil
 
 }
 
 // Pointer marshaller
 
-func newPointerMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller *wrappedMarshaller) error {
+func newPointerMarshaller(
+	target reflect.Type,
+	recfun func(reflect.Type) (*wrappedMarshaller, error)) (*wrappedMarshaller, error) {
 
 	if target.Kind() != reflect.Pointer {
-		return fmt.Errorf("The target %v is not a pointer.", target)
+		return nil, fmt.Errorf("The target %v is not a pointer.", target)
 	}
 
-	if marshaller, err := mapper.getMarshaller(target.Elem()); err != nil {
-		return fmt.Errorf("Can not marshal %v to json: %w", target, err)
-	} else {
-		valueMarshaller.f = func(v reflect.Value) (JsonNode, error) {
+	var (
+		once           sync.Once
+		marshaller     *wrappedMarshaller
+		marshaller_err error
+	)
+
+	return &wrappedMarshaller{
+		t: target,
+		f: func(v reflect.Value) (JsonNode, error) {
+
+			once.Do(func() {
+				marshaller, marshaller_err = recfun(target.Elem())
+			})
+			if marshaller_err != nil {
+				return nil, fmt.Errorf("Can not marshal %v to json: %w", target, marshaller_err)
+			}
+
 			if v.IsZero() {
 				return JSON_NULL, nil
 			} else {
 				return marshaller.f(v.Elem())
 			}
-		}
-		return nil
-	}
+
+		},
+	}, nil
 
 }
 
 // Struct marshaller
 
-func newStructMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller *wrappedMarshaller) error {
+func newStructMarshaller(
+	target reflect.Type,
+	recfun func(reflect.Type) (*wrappedMarshaller, error)) (*wrappedMarshaller, error) {
 
 	if target.Kind() != reflect.Struct {
-		return fmt.Errorf("The target %v is not a struct.", target)
+		return nil, fmt.Errorf("The target %v is not a struct.", target)
 	}
 
-	fieldMarshallers := make([]func(reflect.Value, *JsonBuilder) error, 0, target.NumField())
-	for f := 0; f < target.NumField(); f++ {
+	var (
+		once           sync.Once
+		marshaller_err error
+	)
 
-		field := target.Field(f)
-		if !field.IsExported() {
-			continue
-		}
+	nfields := target.NumField()
+	fieldMarshallers := make([]func(reflect.Value, *JsonBuilder) error, 0, nfields)
 
-		key := field.Tag.Get("json")
-		if key == "" {
-			key = field.Name
-		}
+	return &wrappedMarshaller{
+		t: target,
+		f: func(v reflect.Value) (JsonNode, error) {
 
-		if marshaller, err := mapper.getMarshaller(field.Type); err != nil {
-			return fmt.Errorf("Can not marshal field %v of %v to json: %w", field.Name, target, err)
-		} else {
-			numField := f
-			fieldMarshallers = append(fieldMarshallers, func(v reflect.Value, b *JsonBuilder) error {
-				if json, err := marshaller.f(v.Field(numField)); err != nil {
-					return err
-				} else {
-					b.Set(key, json)
-					return nil
+			once.Do(func() {
+
+				for fieldNum := 0; fieldNum < nfields; fieldNum++ {
+          f := fieldNum
+
+					field := target.Field(f)
+					if !field.IsExported() {
+						continue
+					}
+
+					key := field.Tag.Get("json")
+					if key == "" {
+						key = field.Name
+					}
+
+					if marshaller, e := recfun(field.Type); e != nil {
+
+						marshaller_err = fmt.Errorf("Can not marshal field %v of %v to json: %w", field.Name, target, e)
+						return
+
+					} else {
+
+						fieldMarshallers = append(fieldMarshallers, func(v reflect.Value, b *JsonBuilder) error {
+
+							if json, err := marshaller.f(v.Field(f)); err != nil {
+								return err
+							} else {
+								b.Set(key, json)
+								return nil
+							}
+
+						})
+
+					}
+
 				}
+
 			})
-		}
-
-	}
-
-	valueMarshaller.f = func(v reflect.Value) (JsonNode, error) {
-
-		if v.IsZero() {
-			return JSON_NULL, nil
-		}
-
-		b := NewJsonBuilder()
-
-		for _, marshaller := range fieldMarshallers {
-			if err := marshaller(v, b); err != nil {
-				return JSON_EMPTY_OBJECT, err
+			if marshaller_err != nil {
+				return nil, fmt.Errorf("Can not marshal %v to json: %w", target, marshaller_err)
 			}
-		}
 
-		return b.Build(), nil
+			if v.IsZero() {
+				return JSON_NULL, nil
+			}
 
-	}
-	return nil
+			b := NewJsonBuilder()
+
+			for _, marshaller := range fieldMarshallers {
+				if err := marshaller(v, b); err != nil {
+					return JSON_EMPTY_OBJECT, err
+				}
+			}
+
+			return b.Build(), nil
+
+		},
+	}, nil
 
 }
 
 // Slice marshaller
 
-func newSliceMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller *wrappedMarshaller) error {
+func newSliceMarshaller(
+	target reflect.Type,
+	recfun func(reflect.Type) (*wrappedMarshaller, error)) (*wrappedMarshaller, error) {
 
 	if target.Kind() != reflect.Slice {
-		return fmt.Errorf("The target %v is not a slice.", target)
+		return nil, fmt.Errorf("The target %v is not a slice.", target)
 	}
 
-	if marshaller, err := mapper.getMarshaller(target.Elem()); err != nil {
-		return fmt.Errorf("Can not marshal %v to json: %w", target, err)
-	} else {
-		valueMarshaller.f = func(v reflect.Value) (JsonNode, error) {
+	var (
+		once           sync.Once
+		marshaller     *wrappedMarshaller
+		marshaller_err error
+	)
+
+	return &wrappedMarshaller{
+		t: target,
+		f: func(v reflect.Value) (JsonNode, error) {
+
+			once.Do(func() {
+				marshaller, marshaller_err = recfun(target.Elem())
+			})
+			if marshaller_err != nil {
+				return nil, fmt.Errorf("Can not marshal %v to json: %w", target, marshaller_err)
+			}
+
 			if v.IsZero() {
 				return JSON_NULL, nil
 			}
 			elts := make([]JsonNode, v.Len())
+			var err error
 			for i := 0; i < v.Len(); i++ {
 				if elts[i], err = marshaller.f(v.Index(i)); err != nil {
 					return JSON_EMPTY_ARRAY, err
 				}
 			}
 			return NewJsonArray(elts), nil
-		}
-		return nil
-	}
+
+		},
+	}, nil
 
 }
 
 // Map marshaller
 
-func newMapMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller *wrappedMarshaller) error {
+func newMapMarshaller(
+	target reflect.Type,
+	recfun func(reflect.Type) (*wrappedMarshaller, error)) (*wrappedMarshaller, error) {
 
 	if target.Kind() != reflect.Map {
-		return fmt.Errorf("The target %v is not a map.", target)
+		return nil, fmt.Errorf("The target %v is not a map.", target)
 	} else if target.Key() != stringType {
-		return fmt.Errorf("The target %v key type is not string.", target)
+		return nil, fmt.Errorf("The target %v key type is not string.", target)
 	}
 
-	if marshaller, err := mapper.getMarshaller(target.Elem()); err != nil {
-		return fmt.Errorf("Can not marshal %v to json: %w", target, err)
-	} else {
-		valueMarshaller.f = func(v reflect.Value) (JsonNode, error) {
+	var (
+		once           sync.Once
+		marshaller     *wrappedMarshaller
+		marshaller_err error
+	)
+
+	return &wrappedMarshaller{
+		t: target,
+		f: func(v reflect.Value) (JsonNode, error) {
+
+			once.Do(func() {
+				marshaller, marshaller_err = recfun(target.Elem())
+			})
+			if marshaller_err != nil {
+				return nil, fmt.Errorf("Can not marshal %v to json: %w", target, marshaller_err)
+			}
+
 			if v.IsZero() {
 				return JSON_NULL, nil
 			}
+
 			elts := make(map[string]JsonNode)
 			iter := v.MapRange()
 			for iter.Next() {
@@ -250,9 +324,10 @@ func newMapMarshaller(mapper *JsonMapper, target reflect.Type, valueMarshaller *
 					elts[iter.Key().Interface().(string)] = e
 				}
 			}
+
 			return NewJsonObject(elts), nil
-		}
-		return nil
-	}
+
+		},
+	}, nil
 
 }

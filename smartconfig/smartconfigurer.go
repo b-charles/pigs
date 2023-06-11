@@ -6,6 +6,7 @@ import (
 
 	"github.com/b-charles/pigs/ioc"
 	"github.com/b-charles/pigs/json"
+	"github.com/b-charles/pigs/memfun"
 )
 
 type configurer struct {
@@ -15,12 +16,34 @@ type configurer struct {
 
 type SmartConfigurer struct {
 	config      NavConfig
-	configurers map[reflect.Type]*configurer
+	configurers memfun.MemFun[reflect.Type, *configurer]
+}
+
+func findConfigurer(target reflect.Type, recfun func(reflect.Type) (*configurer, error)) (*configurer, error) {
+
+	if target.Kind() == reflect.Pointer {
+		return newPointerConfigurer(target, recfun)
+	}
+
+	if target.Kind() == reflect.Struct {
+		return newStructConfigurer(target, recfun)
+	}
+
+	if target.Kind() == reflect.Slice {
+		return newSliceConfigurer(target, recfun)
+	}
+
+	if target.Kind() == reflect.Map && target.Key() == string_type {
+		return newMapConfigurer(target, recfun)
+	}
+
+	return nil, fmt.Errorf("No configurer found for type %v.", target)
+
 }
 
 func newSmartConfigurer(config NavConfig, parsers []Parser, inspectors []Inspector) (*SmartConfigurer, error) {
 
-	configurers := map[reflect.Type]*configurer{}
+	configurers := memfun.NewMemFun(findConfigurer)
 
 	for _, parser := range parsers {
 
@@ -28,11 +51,15 @@ func newSmartConfigurer(config NavConfig, parsers []Parser, inspectors []Inspect
 			return nil, fmt.Errorf("Error during recording the parser '%v': %w", parser, err)
 		} else {
 
-			if old, pres := configurers[configurer.target]; pres {
-				return nil, fmt.Errorf("Two configurers '%v' and '%v' are defined to the same target %v.", old, parser, configurer.target)
+			if old, pres, err := configurers.Lookup(configurer.target); err != nil {
+				return nil, err
+			} else if pres {
+				return nil, fmt.Errorf(
+					"Two configurers '%v' and '%v' are defined to the same target %v.",
+					old, parser, configurer.target)
 			}
 
-			configurers[configurer.target] = configurer
+			configurers.Store(configurer.target, configurer)
 
 		}
 
@@ -44,11 +71,13 @@ func newSmartConfigurer(config NavConfig, parsers []Parser, inspectors []Inspect
 			return nil, fmt.Errorf("Error during recording the inspector '%v': %w", inspector, err)
 		} else {
 
-			if old, pres := configurers[configurer.target]; pres {
+			if old, pres, err := configurers.Lookup(configurer.target); err != nil {
+				return nil, err
+			} else if pres {
 				return nil, fmt.Errorf("Two configurers '%v' and '%v' are defined to the same target %v.", old, inspector, configurer.target)
 			}
 
-			configurers[configurer.target] = configurer
+			configurers.Store(configurer.target, configurer)
 
 		}
 
@@ -71,7 +100,7 @@ func (self *SmartConfigurer) Configure(root string, configurable any) error {
 		return fmt.Errorf("The value '%v' is not settable.", configurable)
 	}
 
-	if configurer, err := self.findConfigurer(value.Type()); err != nil {
+	if configurer, err := self.configurers.Get(value.Type()); err != nil {
 		return err
 	} else if err := configurer.setter(self.config.Get(root), value); err != nil {
 		return err
@@ -81,61 +110,9 @@ func (self *SmartConfigurer) Configure(root string, configurable any) error {
 
 }
 
-func (self *SmartConfigurer) findConfigurer(target reflect.Type) (*configurer, error) {
-
-	if configurer, present := self.configurers[target]; present {
-		return configurer, nil
-	}
-
-	if target.Kind() == reflect.Pointer {
-		if configurer, err := newPointerConfigurer(self, target); err != nil {
-			return nil, err
-		} else {
-			self.configurers[target] = configurer
-			return configurer, nil
-		}
-	}
-
-	if target.Kind() == reflect.Struct {
-		if configurer, err := newStructConfigurer(self, target); err != nil {
-			return nil, err
-		} else {
-			self.configurers[target] = configurer
-			return configurer, nil
-		}
-	}
-
-	if target.Kind() == reflect.Slice {
-		if configurer, err := newSliceConfigurer(self, target); err != nil {
-			return nil, err
-		} else {
-			self.configurers[target] = configurer
-			return configurer, nil
-		}
-	}
-
-	if target.Kind() == reflect.Map && target.Key() == string_type {
-		if configurer, err := newMapConfigurer(self, target); err != nil {
-			return nil, err
-		} else {
-			self.configurers[target] = configurer
-			return configurer, nil
-		}
-	}
-
-	return nil, fmt.Errorf("No configurer found for type %v.", target)
-
-}
-
 func (self *SmartConfigurer) Json() json.JsonNode {
-
-	types := make([]reflect.Type, 0, len(self.configurers))
-	for k := range self.configurers {
-		types = append(types, k)
-	}
-
+	types := self.configurers.Keys()
 	return json.ReflectTypeSliceToJson(types)
-
 }
 
 func (self *SmartConfigurer) String() string {

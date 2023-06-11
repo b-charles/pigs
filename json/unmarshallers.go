@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/b-charles/pigs/ioc"
 )
@@ -92,16 +93,31 @@ func init() {
 
 // Pointer unmarshaller
 
-func newPointerUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarshaller *wrappedUnmarshaller) error {
+func newPointerUnmarshaller(
+	target reflect.Type,
+	recfun func(reflect.Type) (*wrappedUnmarshaller, error)) (*wrappedUnmarshaller, error) {
 
 	if target.Kind() != reflect.Pointer {
-		return fmt.Errorf("The target %v is not a pointer.", target)
+		return nil, fmt.Errorf("The target %v is not a pointer.", target)
 	}
 
-	if unmarshaller, err := mapper.getUnmarshaller(target.Elem()); err != nil {
-		return fmt.Errorf("Can not unmarshal %v to json: %w", target, err)
-	} else {
-		valueUnmarshaller.f = func(json JsonNode) (reflect.Value, error) {
+	var (
+		once             sync.Once
+		unmarshaller     *wrappedUnmarshaller
+		unmarshaller_err error
+	)
+
+	return &wrappedUnmarshaller{
+		t: target,
+		f: func(json JsonNode) (reflect.Value, error) {
+
+			once.Do(func() {
+				unmarshaller, unmarshaller_err = recfun(target.Elem())
+			})
+			if unmarshaller_err != nil {
+				return reflect.Value{}, unmarshaller_err
+			}
+
 			if json.IsNull() {
 				return reflect.Zero(target), nil
 			} else if v, err := unmarshaller.f(json); err != nil {
@@ -109,84 +125,122 @@ func newPointerUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmars
 			} else {
 				return v.Addr(), nil
 			}
-		}
-		return nil
-	}
+
+		},
+	}, nil
 
 }
 
 // Struct unmarshaller
 
-func newStructUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarshaller *wrappedUnmarshaller) error {
+func newStructUnmarshaller(
+	target reflect.Type,
+	recfun func(reflect.Type) (*wrappedUnmarshaller, error)) (*wrappedUnmarshaller, error) {
 
 	if target.Kind() != reflect.Struct {
-		return fmt.Errorf("The target %v is not a struct.", target)
+		return nil, fmt.Errorf("The target %v is not a struct.", target)
 	}
 
-	fieldsUnmarshallers := make([]func(JsonNode, reflect.Value) error, 0, target.NumField())
-	for f := 0; f < target.NumField(); f++ {
+	var (
+		once             sync.Once
+		unmarshaller_err error
+	)
 
-		field := target.Field(f)
-		if !field.IsExported() {
-			continue
-		}
+	nfields := target.NumField()
+	fieldsUnmarshallers := make([]func(JsonNode, reflect.Value) error, 0, nfields)
 
-		key := field.Tag.Get("json")
-		if key == "" {
-			key = field.Name
-		}
+	return &wrappedUnmarshaller{
+		t: target,
+		f: func(json JsonNode) (reflect.Value, error) {
 
-		if unmarshaller, err := mapper.getUnmarshaller(field.Type); err != nil {
-			return fmt.Errorf("Can not unmarshal field %v of %v to json: %w", field.Name, target, err)
-		} else {
-			numField := f
-			fieldsUnmarshallers = append(fieldsUnmarshallers, func(json JsonNode, value reflect.Value) error {
-				if v, err := unmarshaller.f(json.GetMember(key)); err != nil {
-					return fmt.Errorf("Can't unmarshall field %v: %w", key, err)
-				} else {
-					value.Field(numField).Set(v)
-					return nil
+			once.Do(func() {
+
+				for fieldNum := 0; fieldNum < nfields; fieldNum++ {
+					f := fieldNum
+
+					field := target.Field(f)
+					if !field.IsExported() {
+						continue
+					}
+
+					key := field.Tag.Get("json")
+					if key == "" {
+						key = field.Name
+					}
+
+					if unmarshaller, e := recfun(field.Type); e != nil {
+
+						unmarshaller_err = fmt.Errorf("Can not unmarshal field %v of %v to json: %w", field.Name, target, e)
+						return
+
+					} else {
+
+						fieldsUnmarshallers = append(fieldsUnmarshallers, func(json JsonNode, value reflect.Value) error {
+
+							if v, err := unmarshaller.f(json.GetMember(key)); err != nil {
+								return fmt.Errorf("Can't unmarshall field %v: %w", key, err)
+							} else {
+								value.Field(f).Set(v)
+								return nil
+							}
+
+						})
+
+					}
+
 				}
+
 			})
-		}
-
-	}
-
-	valueUnmarshaller.f = func(json JsonNode) (reflect.Value, error) {
-
-		value := reflect.New(target).Elem()
-
-		if json.IsNull() {
-			return value, nil
-		} else if !json.IsObject() {
-			return reflect.Value{}, fmt.Errorf("Can not parse json %v as an object.", json)
-		} else {
-			for _, unmarshaller := range fieldsUnmarshallers {
-				if err := unmarshaller(json, value); err != nil {
-					return reflect.Value{}, err
-				}
+			if unmarshaller_err != nil {
+				return reflect.Value{}, unmarshaller_err
 			}
-			return value, nil
-		}
 
-	}
-	return nil
+			value := reflect.New(target).Elem()
+
+			if json.IsNull() {
+				return value, nil
+			} else if !json.IsObject() {
+				return reflect.Value{}, fmt.Errorf("Can not parse json %v as an object.", json)
+			} else {
+				for _, unmarshaller := range fieldsUnmarshallers {
+					if err := unmarshaller(json, value); err != nil {
+						return reflect.Value{}, err
+					}
+				}
+				return value, nil
+			}
+
+		},
+	}, nil
 
 }
 
 // Slice unmarshaller
 
-func newSliceUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarshaller *wrappedUnmarshaller) error {
+func newSliceUnmarshaller(
+	target reflect.Type,
+	recfun func(reflect.Type) (*wrappedUnmarshaller, error)) (*wrappedUnmarshaller, error) {
 
 	if target.Kind() != reflect.Slice {
-		return fmt.Errorf("The target %v is not a slice.", target)
+		return nil, fmt.Errorf("The target %v is not a slice.", target)
 	}
 
-	if unmarshaller, err := mapper.getUnmarshaller(target.Elem()); err != nil {
-		return fmt.Errorf("Can not unmarshal %v to json: %w", target, err)
-	} else {
+	var (
+		once             sync.Once
+		unmarshaller     *wrappedUnmarshaller
+		unmarshaller_err error
+	)
 
-		valueUnmarshaller.f = func(json JsonNode) (reflect.Value, error) {
+	return &wrappedUnmarshaller{
+		t: target,
+		f: func(json JsonNode) (reflect.Value, error) {
+
+			once.Do(func() {
+				unmarshaller, unmarshaller_err = recfun(target.Elem())
+			})
+			if unmarshaller_err != nil {
+				return reflect.Value{}, unmarshaller_err
+			}
 
 			if json.IsNull() {
 				return reflect.Zero(target), nil
@@ -205,34 +259,44 @@ func newSliceUnmarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarsha
 				return elts, nil
 			}
 
-		}
-
-		return nil
-
-	}
+		},
+	}, nil
 
 }
 
 // Map unmarshaller
 
-func newMapUnMarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarshaller *wrappedUnmarshaller) error {
+func newMapUnMarshaller(
+	target reflect.Type,
+	recfun func(reflect.Type) (*wrappedUnmarshaller, error)) (*wrappedUnmarshaller, error) {
 
 	if target.Kind() != reflect.Map {
-		return fmt.Errorf("The target %v is not a map.", target)
+		return nil, fmt.Errorf("The target %v is not a map.", target)
 	} else if target.Key() != stringType {
-		return fmt.Errorf("The target %v key type is not string.", target)
+		return nil, fmt.Errorf("The target %v key type is not string.", target)
 	}
 
-	if unmarshaller, err := mapper.getUnmarshaller(target.Elem()); err != nil {
-		return fmt.Errorf("Can not unmarshal %v to json: %w", target, err)
-	} else {
+	var (
+		once             sync.Once
+		unmarshaller     *wrappedUnmarshaller
+		unmarshaller_err error
+	)
 
-		valueUnmarshaller.f = func(json JsonNode) (reflect.Value, error) {
+	return &wrappedUnmarshaller{
+		t: target,
+		f: func(json JsonNode) (reflect.Value, error) {
+
+			once.Do(func() {
+				unmarshaller, unmarshaller_err = recfun(target.Elem())
+			})
+			if unmarshaller_err != nil {
+				return reflect.Value{}, unmarshaller_err
+			}
 
 			if json.IsNull() {
 				return reflect.Zero(target), nil
 			} else if !json.IsObject() {
-				return reflect.Value{}, fmt.Errorf("Can not parse json %v as a slice.", json)
+				return reflect.Value{}, fmt.Errorf("Can not parse json %v as a map.", json)
 			} else {
 				members := reflect.MakeMap(target)
 				for _, k := range json.GetKeys() {
@@ -245,10 +309,7 @@ func newMapUnMarshaller(mapper *JsonMapper, target reflect.Type, valueUnmarshall
 				return members, nil
 			}
 
-		}
-
-		return nil
-
-	}
+		},
+	}, nil
 
 }

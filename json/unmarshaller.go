@@ -9,13 +9,8 @@ import (
 type JsonUnmarshaller any
 
 type wrappedUnmarshaller struct {
-	src JsonMarshaller
-	t   reflect.Type
-	f   func(JsonNode) (reflect.Value, error)
-}
-
-func (self *wrappedUnmarshaller) String() string {
-	return fmt.Sprint(self.src)
+	t reflect.Type
+	f func(JsonNode) (reflect.Value, error)
 }
 
 func wrapUnmarshaller(unmarshaller JsonUnmarshaller) (*wrappedUnmarshaller, error) {
@@ -40,6 +35,6 @@ func wrapUnmarshaller(unmarshaller JsonUnmarshaller) (*wrappedUnmarshaller, erro
 		}
 	}
 
-	return &wrappedUnmarshaller{unmarshaller, t.Out(0), f}, nil
+	return &wrappedUnmarshaller{t.Out(0), f}, nil
 
 }

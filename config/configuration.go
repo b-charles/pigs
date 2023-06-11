@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/b-charles/pigs/ioc"
 	"github.com/b-charles/pigs/json"
+	"github.com/b-charles/pigs/memfun"
 )
 
 /*
@@ -21,8 +23,51 @@ type ConfigSource interface {
 }
 
 /*
- * Mutable config
+ * Config
  */
+
+var placeholderRegexp *regexp.Regexp = regexp.MustCompile("\\${\\s*([^{}]+)\\s*}")
+
+type pstring struct {
+	p   bool
+	str string
+}
+
+func resolveValue(raws sync.Map, key string, recfun func(string) (pstring, error)) (pstring, error) {
+
+	if uncastedValue, p := raws.Load(key); !p {
+
+		return pstring{false, ""}, nil
+
+	} else {
+
+		value := uncastedValue.(string)
+
+		replace := true
+		for replace {
+
+			replace = false
+			if matches := placeholderRegexp.FindAllStringSubmatch(value, -1); matches != nil {
+				for _, match := range matches {
+
+					if subpvalue, err := recfun(match[1]); err != nil {
+						return subpvalue, err
+					} else if subpvalue.p {
+						value = strings.Replace(value, match[0], subpvalue.str, -1)
+						replace = true
+						break
+					}
+
+				}
+			}
+
+		}
+
+		return pstring{true, value}, nil
+
+	}
+
+}
 
 type MutableConfig interface {
 	HasKey(string) bool
@@ -43,80 +88,109 @@ type Configuration interface {
 
 type configImpl struct {
 	mutable  bool
-	raws     map[string]string
-	resolved map[string]string
+	raws     sync.Map
+	resolved memfun.MemFun[string, pstring]
+}
+
+func newConfigImpl() *configImpl {
+
+	config := new(configImpl)
+	config.mutable = false
+	config.resolved = memfun.NewMemFun(func(key string, recfun func(string) (pstring, error)) (pstring, error) {
+		return resolveValue(config.raws, key, recfun)
+	})
+
+	return config
+
 }
 
 func (self *configImpl) HasKey(key string) bool {
-	_, p := self.raws[key]
+	_, p := self.raws.Load(key)
 	return p
 }
 
 func (self *configImpl) Keys() []string {
-	keys := make([]string, 0, len(self.raws))
-	for k := range self.raws {
-		keys = append(keys, k)
-	}
+	keys := make([]string, 0)
+	self.raws.Range(func(k, v any) bool {
+		keys = append(keys, k.(string))
+		return true
+	})
 	return keys
 }
 
 func (self *configImpl) GetRaw(key string) (string, bool) {
-	value, p := self.raws[key]
-	return value, p
-}
-
-var placeholderRegexp *regexp.Regexp = regexp.MustCompile("\\${\\s*([^{}]+)\\s*}")
-
-func (self *configImpl) resolveValue(key string, traveled map[string]bool) (string, bool, *CyclicLoopError) {
-
-	if resolved, p := self.resolved[key]; p {
-		return resolved, true, nil
-	}
-	if value, p := self.raws[key]; !p {
-		return "", false, nil
-	} else {
-
-		if t, p := traveled[key]; p && t {
-			return value, true, newCyclicLoopError(key, value)
-		}
-		traveled[key] = true
-
-		replace := true
-		for replace {
-
-			replace = false
-			if matches := placeholderRegexp.FindAllStringSubmatch(value, -1); matches != nil {
-				for _, match := range matches {
-					if subvalue, found, err := self.resolveValue(match[1], traveled); err != nil {
-						return "", true, err.push(key, value)
-					} else if found {
-						value = strings.Replace(value, match[0], subvalue, -1)
-						replace = true
-						break
-					}
-				}
-			}
-
-		}
-
-		traveled[key] = false
-
-		if !self.mutable {
-			self.resolved[key] = value
-		}
-
-		return value, true, nil
-
-	}
-
+	value, p := self.raws.Load(key)
+	return value.(string), p
 }
 
 func (self *configImpl) Lookup(key string) (string, bool, error) {
-	if value, found, err := self.resolveValue(key, map[string]bool{}); err == (*CyclicLoopError)(nil) {
-		return value, found, nil
+
+	var (
+		result pstring
+		err    error
+	)
+
+	if self.mutable {
+
+		called := map[string]bool{key: true}
+
+		var recfun func(k string) (pstring, error)
+		recfun = func(k string) (pstring, error) {
+
+			if _, p := called[k]; p {
+				return pstring{false, ""}, memfun.CyclicLoopError[string]{
+					Stack: []string{k},
+				}
+			}
+
+			called[key] = true
+			defer delete(called, key)
+
+			r, e := resolveValue(self.raws, key, recfun)
+
+			if e != nil {
+				if cyclic, ok := e.(memfun.CyclicLoopError[string]); ok {
+					return r, cyclic.Append(key)
+				}
+			}
+
+			return r, e
+
+		}
+
+		result, err = resolveValue(self.raws, key, recfun)
+
 	} else {
-		return value, found, error(err)
+
+		result, err = self.resolved.Get(key)
+
 	}
+
+	if err != nil {
+		if cyclic, ok := err.(memfun.CyclicLoopError[string]); ok {
+
+			var b strings.Builder
+
+			b.WriteString("Cyclic loop detected: ")
+
+			fmtElt := func(k string) string {
+				v, _ := self.raws.Load(k)
+				return fmt.Sprintf("%s: '%v'", k, v)
+			}
+
+			b.WriteString(fmtElt(cyclic.Stack[0]))
+			for i := 1; i < len(cyclic.Stack); i++ {
+				b.WriteString(" -> ")
+				b.WriteString(fmtElt(cyclic.Stack[i]))
+			}
+
+			return "", false, errors.New(b.String())
+
+		}
+	}
+
+	return result.str, result.p, err
+
 }
 
 func (self *configImpl) Get(key string) string {
@@ -128,63 +202,23 @@ func (self *configImpl) Get(key string) string {
 }
 
 func (self *configImpl) Set(key, value string) {
-	self.raws[key] = value
+	self.raws.Store(key, value)
 }
 
 func (self *configImpl) Json() json.JsonNode {
-	return json.NewJsonObjectStrings(self.raws)
+
+	r := make(map[string]string)
+	self.raws.Range(func(key, value any) bool {
+		r[key.(string)] = value.(string)
+		return true
+	})
+
+	return json.NewJsonObjectStrings(r)
+
 }
 
 func (self *configImpl) String() string {
 	return self.Json().String()
-}
-
-/*
- * Cyclic loop error
- */
-
-type CyclicLoopElement struct {
-	key   string
-	value string
-}
-
-type CyclicLoopError struct {
-	loop []CyclicLoopElement
-}
-
-func newCyclicLoopError(key, value string) *CyclicLoopError {
-	err := &CyclicLoopError{make([]CyclicLoopElement, 0)}
-	return err.push(key, value)
-}
-
-func (self *CyclicLoopError) push(key, value string) *CyclicLoopError {
-	self.loop = append(self.loop, CyclicLoopElement{key, value})
-	return self
-}
-
-func (self *CyclicLoopError) Error() string {
-
-	if self == nil {
-		return "Nil cyclic loop error. Should not be raised."
-	}
-
-	var b strings.Builder
-
-	b.WriteString("Cyclic loop detected: ")
-
-	b.WriteString(self.loop[0].key)
-	b.WriteString(":'")
-	b.WriteString(self.loop[0].value)
-	for i := 1; i < len(self.loop); i++ {
-		b.WriteString("' -> ")
-		b.WriteString(self.loop[i].key)
-		b.WriteString(":'")
-		b.WriteString(self.loop[i].value)
-	}
-	b.WriteString("'")
-
-	return b.String()
-
 }
 
 /*
@@ -252,11 +286,7 @@ func CreateConfiguration(sources []ConfigSource) (Configuration, error) {
 		return sources[i].GetPriority() < sources[j].GetPriority()
 	})
 
-	conf := &configImpl{
-		mutable:  true,
-		raws:     make(map[string]string),
-		resolved: make(map[string]string),
-	}
+	conf := newConfigImpl()
 
 	for k, v := range getDefaultConfigMap() {
 		conf.Set(k, v)
