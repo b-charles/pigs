@@ -32,7 +32,7 @@ A component is something: a struct, a pointer, a map, a chan, an integer... It's
  * its main type, computed by reflection on the given value or the factory.
  * and optionally some _signature_ interfaces which are some additional interfaces implemented by the component[^duck].
 
-Multiple components can share the same main type and signatures to enable auto-discovery, but that concept can be confusing and error-prone: it can be considered good practice to register each component with a specific and unique main type, and using signatures only when auto-discovery is needed.
+Multiple components can share the same main type and signatures to enable auto-discovery.
 Any component with a value `nil` will be silently discarded and never be injected in another component. This behaviour, together with auto-discovery and scopes features, helps implement conditional component creation.
 
 A container is a set of components: it manages the life cycle of each component and take in charge the injection process. The framework defines one instance of this container and redirect all API calls to that container. The container defines by itself two special components of type `ioc.ContainerStatus` and `ioc.ContainerInfo` (see [Special components](#special-components)), and the framework defines also some components for classical integration (see [Default integration](#default-integration)).
