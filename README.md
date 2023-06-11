@@ -36,6 +36,7 @@ $ go get github.com/b-charles/pigs
 Pigs is collection of small packages exposed with an IOC framework.
 
 The packages are:
+ * [memfun](memfun/README.md): a small synchronized memoization library.
  * [ioc](ioc/README.md): The IOC framework. Completly written from scratch for the Pigs needs.
  * [json](json/README.md): Because.
  * [config](config/README.md): Configuration collector.
