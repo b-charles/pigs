@@ -45,7 +45,5 @@ The packages are:
 
 ## When Pigs?
 
-TODO list:
- * Unix signal support
- * ApplicationContainer's life-cycle awareness
+The release dates of Pigs are erratics, the APIs and functionalities can change any time for best or the worst, but it should be pleasantly usable right now.
 
